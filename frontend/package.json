@@ -5,11 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "postinstall": "next build"   
+    "start": "next start"
   },
   "dependencies": {
-    "ai": "^2.2.31",
+    "ai": "^3.4.7",
     "axios": "^1.7.2",
     "next": "^16.2.6",
     "react": "^19.2.6",
