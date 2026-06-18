@@ -9,6 +9,9 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+# Import the extractors
+from extractors import get_instagram_profile_posts
+
 load_dotenv()
 backend_dir = Path(__file__).resolve().parent
 
@@ -17,7 +20,7 @@ if not os.getenv("GOOGLE_API_KEY"):
 
 # Fixed models
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.3)
-embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-2-preview")   # ← Fixed
+embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-2-preview")
 
 vector_store = Chroma(
     embedding_function=embeddings, 
@@ -25,37 +28,72 @@ vector_store = Chroma(
 )
 
 def analyze_profile(profile_handle: str, focus: str = "growth, best posts, trends, suggestions"):
+    print(f"🔍 Analyzing profile: {profile_handle}")
+    
+    # Fetch real Instagram posts
+    try:
+        posts = get_instagram_profile_posts(profile_handle, max_posts=12)
+        print(f"✅ Fetched {len(posts)} posts from Instagram")
+    except Exception as e:
+        print(f"⚠️ Failed to fetch posts: {e}")
+        posts = []
+
+    # Optional: Web search for additional context
     search = DuckDuckGoSearchRun()
-    
-    search_query = f"{profile_handle} instagram OR tiktok OR x OR youtube best reels OR posts OR growth OR trends OR engagement 2026"
-    search_results = search.run(search_query)
-    
+    search_query = f"{profile_handle} instagram reels best performing content OR trends 2026"
+    try:
+        search_results = search.run(search_query)
+    except Exception as e:
+        print(f"⚠️ Search failed: {e}")
+        search_results = "No additional search results available."
+
+    # Create a nice summary of posts
+    posts_summary = "\n".join([
+        f"- {p.get('title', 'Untitled')} | Views: {p.get('views', 0)} | Likes: {p.get('likes', 0)} | "
+        f"Comments: {p.get('comments', 0)} | Engagement: {p.get('engagement_rate', 0)}% | Date: {p.get('upload_date')}"
+        for p in posts[:10]
+    ]) if posts else "No posts were fetched."
+
     prompt = f"""
-    You are a top social media growth strategist in 2026.
+You are a top social media growth strategist in 2026.
 
-    Profile: {profile_handle}
-    Focus: {focus}
+Profile: @{profile_handle}
+Focus: {focus}
 
-    Recent search results:
-    {search_results}
+Recent Posts Data:
+{posts_summary}
 
-    Provide a clear structured response:
-    - Key Insights & Metrics
-    - Best Performing Content
-    - Current Trends
-    - 4-5 Actionable Recommendations
-    """
+Additional Web Context:
+{search_results}
+
+Provide a clear, structured, and actionable response with these sections:
+
+- Key Insights & Metrics
+- Best Performing Content (reference actual posts when available)
+- Current Trends Relevant to this Profile
+- 4-5 Specific Actionable Recommendations
+
+Be honest if data is limited.
+"""
 
     response = llm.invoke(prompt)
     result = response.content if hasattr(response, 'content') else str(response)
     
-    # Store
+    # Store analysis in vector store for chat memory
     doc = Document(
         page_content=result,
-        metadata={"profile": profile_handle, "type": "profile_analysis", "timestamp": datetime.now().isoformat()}
+        metadata={
+            "profile": profile_handle, 
+            "type": "profile_analysis", 
+            "timestamp": datetime.now().isoformat()
+        }
     )
     splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
     chunks = splitter.split_documents([doc])
     vector_store.add_documents(chunks)
     
     return result
+
+
+# Keep the original vector store for chat
+__all__ = ["analyze_profile", "vector_store", "llm"]
