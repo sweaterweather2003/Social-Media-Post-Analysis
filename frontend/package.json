@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "postinstall": "next build"   // ← Helpful for some hosts
+    "postinstall": "next build"   
   },
   "dependencies": {
     "ai": "^2.2.31",
