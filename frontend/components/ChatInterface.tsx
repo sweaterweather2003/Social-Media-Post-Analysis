@@ -19,6 +19,8 @@ export default function ChatInterface({ videoA, videoB }: { videoA: any; videoB:
     setLoading(true);
 
     try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+      
       const res = await axios.post(`${apiUrl}/chat`, {
         message: input,
         video_a_metadata: videoA,
