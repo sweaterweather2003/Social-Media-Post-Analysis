@@ -1,4 +1,4 @@
-// /home/workdir/attachments/route.ts
+// /app/api/chat/route.ts
 import { StreamingTextResponse } from 'ai';
 
 export async function POST(req: Request) {
@@ -10,7 +10,9 @@ export async function POST(req: Request) {
     content: m.content,
   }));
 
-  const response = await fetch('http://localhost:8001/api/chat', {
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+
+  const response = await fetch(`${backendUrl}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
