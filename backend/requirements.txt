@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+langchain
+langchain-community
+langgraph
+langchain-google-genai
+langchain-chroma
+duckduckgo-search
+chromadb
+ddgs
+instaloader
