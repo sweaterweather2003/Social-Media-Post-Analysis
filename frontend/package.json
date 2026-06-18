@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "postinstall": "next build"   // ← Helpful for some hosts
   },
   "dependencies": {
     "ai": "^2.2.31",
@@ -18,5 +19,8 @@
     "@types/node": "25.9.1",
     "@types/react": "19.2.15",
     "typescript": "6.0.3"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
