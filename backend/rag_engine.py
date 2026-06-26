@@ -10,7 +10,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # Import the extractors
-from extractors import get_instagram_profile_posts
+from extractors import get_instagram_profile_posts, get_instagram_posts_by_shortcodes
 
 load_dotenv()
 backend_dir = Path(__file__).resolve().parent
@@ -95,5 +95,61 @@ Be honest if data is limited.
     return result
 
 
+def analyze_posts(shortcodes: List[str], focus: str = "engagement comparison, best performing, improvement suggestions"):
+    print(f"🔍 Analyzing {len(shortcodes)} Instagram posts")
+    
+    try:
+        posts = get_instagram_posts_by_shortcodes(shortcodes)
+        print(f"✅ Fetched {len(posts)} posts")
+    except Exception as e:
+        print(f"⚠️ Failed to fetch posts: {e}")
+        posts = []
+
+    posts_summary = "\n".join([
+        f"- {p.get('title')} | Views: {p.get('views')} | Likes: {p.get('likes')} | "
+        f"Comments: {p.get('comments')} | Engagement: {p.get('engagement_rate')}% | "
+        f"Shortcode: {p.get('post_id')}"
+        for p in posts
+    ]) if posts else "No posts were fetched."
+
+    prompt = f"""
+You are a top social media growth strategist in 2026.
+
+Analyzing Specific Instagram Posts
+Focus: {focus}
+
+Post Data:
+{posts_summary}
+
+Provide a detailed comparison analysis with these sections:
+
+- Performance Comparison
+- Key Insights & Patterns
+- What Worked Best
+- Improvement Recommendations for Each Post
+- General Strategy Suggestions
+
+Be specific and reference post shortcodes where possible.
+"""
+
+    response = llm.invoke(prompt)
+    result = response.content if hasattr(response, 'content') else str(response)
+    
+    # Store in vector store
+    doc = Document(
+        page_content=result,
+        metadata={
+            "type": "posts_analysis", 
+            "shortcodes": ",".join(shortcodes),
+            "timestamp": datetime.now().isoformat()
+        }
+    )
+    splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+    chunks = splitter.split_documents([doc])
+    vector_store.add_documents(chunks)
+    
+    return result
+
+
 # Keep the original vector store for chat
-__all__ = ["analyze_profile", "vector_store", "llm"]
+__all__ = ["analyze_profile", "analyze_posts", "vector_store", "llm"]
