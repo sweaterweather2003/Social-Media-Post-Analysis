@@ -3,20 +3,25 @@ from pathlib import Path
 from datetime import datetime
 from typing import List
 
+from dotenv import load_dotenv
+
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+# Import extractors
 from extractors import get_instagram_profile_posts, get_instagram_posts_by_shortcodes
 
 load_dotenv()
+
 backend_dir = Path(__file__).resolve().parent
 
 if not os.getenv("GOOGLE_API_KEY"):
     raise ValueError("CRITICAL ERROR: GOOGLE_API_KEY is missing from your .env file!")
 
+# Models
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.4)
 embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-2-preview")
 
@@ -35,14 +40,15 @@ def analyze_posts(shortcodes: List[str], focus: str = "engagement comparison, be
         print(f"⚠️ Failed to fetch posts: {e}")
         posts = []
 
-    # Build detailed post data including full captions
+    # Build detailed post data with full captions
     posts_details = []
     for i, p in enumerate(posts):
         full_caption = p.get('transcript', 'No caption available.')
         posts_details.append(f"""
 Post {i+1}:
-Title: {p.get('title')}
-Views: {p.get('views')} | Likes: {p.get('likes')} | Comments: {p.get('comments')} | Engagement: {p.get('engagement_rate')}%
+Title: {p.get('title', 'No title')}
+Views: {p.get('views', 0)} | Likes: {p.get('likes', 0)} | 
+Comments: {p.get('comments', 0)} | Engagement: {p.get('engagement_rate', 0)}%
 
 FULL VERBATIM CAPTION:
 {full_caption}
@@ -53,34 +59,30 @@ FULL VERBATIM CAPTION:
     prompt = f"""
 You are a professional social media growth strategist.
 
-Here is the complete data for the Instagram Reels:
+Here is the complete data for the Instagram Reels the user asked about:
 
 {posts_summary}
 
-Now respond in this exact structure:
+Respond in this exact structure:
 
 **1. Full Captions (Verbatim)**
 
-[Show the complete original caption for each post here, without summarizing or shortening it.]
+[Show the complete original caption for each post here. Do not summarize or shorten it. Show it exactly as it appears.]
 
-**2. Analysis & Summary**
+**2. Analysis & Strategic Insights**
 
-Then provide your strategic analysis:
-- Overall Performance
+Then provide your professional analysis:
+- Overall Performance Summary
 - What Worked Well
 - Areas for Improvement
 - Actionable Recommendations
 
-Rules:
-- First show the FULL verbatim captions.
-- Only after that, give your analysis.
-- Write naturally and professionally.
+Write naturally and professionally.
 """
 
     response = llm.invoke(prompt)
     result = response.content if hasattr(response, 'content') else str(response)
     
-    # Store in vector store
     doc = Document(
         page_content=result,
         metadata={"type": "posts_analysis", "timestamp": datetime.now().isoformat()}
@@ -93,7 +95,6 @@ Rules:
 
 
 def analyze_profile(profile_handle: str, focus: str = "growth, best posts, trends, suggestions"):
-    # ... (keep your existing analyze_profile function unchanged)
     print(f"🔍 Analyzing profile: {profile_handle}")
     
     try:
@@ -118,7 +119,7 @@ def analyze_profile(profile_handle: str, focus: str = "growth, best posts, trend
     ]) if posts else "No posts were fetched."
 
     prompt = f"""
-You are a top social media growth strategist in 2026. Speak naturally.
+You are a top social media growth strategist in 2026. Speak naturally and conversationally.
 
 Profile: @{profile_handle}
 Focus: {focus}
@@ -129,7 +130,7 @@ Recent Posts Data:
 Additional Web Context:
 {search_results}
 
-Provide a clear, natural, and actionable response.
+Provide a clear, structured, and actionable response.
 """
 
     response = llm.invoke(prompt)
