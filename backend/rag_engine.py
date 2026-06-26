@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
+from typing import List
 
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.tools import DuckDuckGoSearchRun
@@ -9,7 +10,6 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# Import the extractors
 from extractors import get_instagram_profile_posts, get_instagram_posts_by_shortcodes
 
 load_dotenv()
@@ -18,7 +18,6 @@ backend_dir = Path(__file__).resolve().parent
 if not os.getenv("GOOGLE_API_KEY"):
     raise ValueError("CRITICAL ERROR: GOOGLE_API_KEY is missing from your .env file!")
 
-# Fixed models
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.4)
 embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-2-preview")
 
@@ -52,7 +51,7 @@ def analyze_profile(profile_handle: str, focus: str = "growth, best posts, trend
     ]) if posts else "No posts were fetched."
 
     prompt = f"""
-You are a top social media growth strategist in 2026.
+You are a top social media growth strategist in 2026. Speak naturally and conversationally.
 
 Profile: @{profile_handle}
 Focus: {focus}
@@ -63,14 +62,7 @@ Recent Posts Data:
 Additional Web Context:
 {search_results}
 
-Provide a clear, structured, and actionable response with these sections:
-
-- Key Insights & Metrics
-- Best Performing Content
-- Current Trends Relevant to this Profile
-- 4-5 Specific Actionable Recommendations
-
-Write naturally like a professional strategist. Do not use technical shortcodes in the final response.
+Provide a clear, natural, and actionable response. Use bullet points where helpful but write like a human expert.
 """
 
     response = llm.invoke(prompt)
@@ -98,32 +90,30 @@ def analyze_posts(shortcodes: List[str], focus: str = "engagement comparison, be
         posts = []
 
     posts_summary = "\n".join([
-        f"Post {i+1}: {p.get('title')} | Views: {p.get('views')} | Likes: {p.get('likes')} | "
+        f"Post {i+1} - Title: {p.get('title')} | Views: {p.get('views')} | Likes: {p.get('likes')} | "
         f"Comments: {p.get('comments')} | Engagement: {p.get('engagement_rate')}%"
         for i, p in enumerate(posts)
     ]) if posts else "No posts were fetched."
 
     prompt = f"""
-You are a friendly, professional social media growth strategist in 2026. Speak naturally and conversationally.
+You are a friendly and professional social media growth strategist in 2026. 
+Speak naturally, like you're talking directly to the user. Avoid technical jargon.
 
-You are analyzing Instagram Reels for the user.
+You analyzed some Instagram Reels. Here is the data:
 
-Post Data:
 {posts_summary}
 
-Provide a clean, natural response with these sections:
+Now give a clean, natural response with these sections:
 
 - Overall Performance Summary
-- What Stood Out (Best Aspects)
-- Areas for Improvement
-- Actionable Recommendations
+- What Worked Well
+- Areas to Improve  
+- Actionable Next Steps
 
-Important Instructions:
-- Write like a human expert, not a robot.
-- Do NOT mention shortcodes, technical IDs, or internal references.
-- Refer to posts as "the first reel", "the second reel", "the food reel", "the storytelling reel", etc.
-- Be encouraging but honest.
-- Keep the tone professional yet approachable.
+Important:
+- Do not mention shortcodes or technical IDs.
+- Refer to posts as "the first reel", "the recipe reel", "the storytelling reel", etc.
+- Write conversationally and encouragingly.
 """
 
     response = llm.invoke(prompt)
