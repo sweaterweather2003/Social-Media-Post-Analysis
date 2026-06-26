@@ -75,8 +75,13 @@ def get_instagram_profile_posts(username: str, max_posts: int = 12) -> List[Dict
 def get_instagram_post(shortcode: str) -> Dict:
     import instaloader
     L = instaloader.Instaloader()
+    
+    # Better headers to avoid detection
     L.context._session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.instagram.com/"
     })
     
     try:
@@ -85,32 +90,38 @@ def get_instagram_post(shortcode: str) -> Dict:
         data = {
             "post_id": post.shortcode,
             "platform": "Instagram",
-            "creator": post.owner_username,
-            "title": (post.caption or "Reel").split('\n')[0][:100],
-            "views": getattr(post, 'video_view_count', 0) or 0,
-            "likes": post.likes or 0,
-            "comments": post.comments or 0,
-            "engagement_rate": calculate_engagement(post.likes or 0, post.comments or 0, getattr(post, 'video_view_count', 0)),
-            "transcript": post.caption or "No caption available.",
+            "creator": getattr(post, 'owner_username', 'Unknown'),
+            "title": (getattr(post, 'caption', None) or "Reel").split('\n')[0][:100],
+            "views": getattr(post, 'video_view_count', 0) or getattr(post, 'view_count', 0) or 0,
+            "likes": getattr(post, 'likes', 0) or 0,
+            "comments": getattr(post, 'comments', 0) or 0,
+            "engagement_rate": calculate_engagement(
+                getattr(post, 'likes', 0) or 0, 
+                getattr(post, 'comments', 0) or 0, 
+                getattr(post, 'video_view_count', 0) or getattr(post, 'view_count', 0) or 0
+            ),
+            "transcript": getattr(post, 'caption', None) or "No caption available.",
             "url": f"https://www.instagram.com/reel/{post.shortcode}/",
             "hashtags": [f"#{tag}" for tag in getattr(post, 'caption_hashtags', [])],
-            "upload_date": post.date_utc.strftime("%Y-%m-%d"),
-            "duration": int(getattr(post, 'video_duration', 0)),
+            "upload_date": post.date_utc.strftime("%Y-%m-%d") if hasattr(post, 'date_utc') else datetime.datetime.now().strftime("%Y-%m-%d"),
+            "duration": int(getattr(post, 'video_duration', 0) or 0),
             "post_type": "reel"
         }
+        print(f"✅ Successfully fetched post {shortcode}")
         return data
     except Exception as e:
         print(f"⚠️ Error fetching post {shortcode}: {e}")
+        # Return more informative fallback
         return {
             "post_id": shortcode,
             "platform": "Instagram",
             "creator": "Unknown",
-            "title": f"Post {shortcode} (Error)",
+            "title": f"Post {shortcode} (Limited Access)",
             "views": 0,
             "likes": 0,
             "comments": 0,
             "engagement_rate": 0.0,
-            "transcript": "Could not fetch post details.",
+            "transcript": f"Could not fetch full data for this post. Instagram scraping is heavily restricted. Shortcode: {shortcode}",
             "url": f"https://www.instagram.com/reel/{shortcode}/",
             "hashtags": [],
             "upload_date": datetime.datetime.now().strftime("%Y-%m-%d"),
@@ -120,12 +131,13 @@ def get_instagram_post(shortcode: str) -> Dict:
 
 
 def get_instagram_posts_by_shortcodes(shortcodes: List[str]) -> List[Dict]:
+    print(f"Fetching {len(shortcodes)} Instagram posts...")
     return [get_instagram_post(code.strip()) for code in shortcodes if code.strip()]
 
 
 def get_all_platform_posts(instagram_username: str, twitter_username: str = "", facebook_page: str = ""):
     return {
         "Instagram": get_instagram_profile_posts(instagram_username),
-        "Twitter": get_twitter_profile_posts(twitter_username),
-        "Facebook": get_facebook_page_posts(facebook_page)
+        "Twitter": [],
+        "Facebook": []
     }
