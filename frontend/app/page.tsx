@@ -40,6 +40,7 @@ export default function Home() {
   const [fbPage, setFbPage] = useState("");
   const [postInput, setPostInput] = useState("");
   const [mode, setMode] = useState<"accounts" | "posts">("accounts");
+  const [postType, setPostType] = useState<"reels" | "all">("reels");
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastAnalysis, setLastAnalysis] = useState<any>(null);
 
@@ -61,19 +62,12 @@ export default function Home() {
     "Compare my Instagram vs x performance",
   ];
 
-  // Helper to extract shortcode from URL or use direct shortcode
   const extractShortcode = (input: string): string[] => {
     return input.split(',').map(item => {
       const trimmed = item.trim();
       if (!trimmed) return null;
-      
-      // Handle full Instagram URL
-      const urlMatch = trimmed.match(/instagram\.com\/reel\/([A-Za-z0-9_-]+)/);
-      if (urlMatch && urlMatch[1]) {
-        return urlMatch[1];
-      }
-      
-      // Return as shortcode if it looks like one
+      const urlMatch = trimmed.match(/instagram\.com\/(?:reel|p)\/([A-Za-z0-9_-]+)/);
+      if (urlMatch && urlMatch[1]) return urlMatch[1];
       return trimmed;
     }).filter(Boolean) as string[];
   };
@@ -92,35 +86,33 @@ export default function Home() {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analyze-profile`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            profile: igUsername,
-            focus: "growth, best performing posts, current trends, improvement suggestions"
+          body: JSON.stringify({ 
+            profile: igUsername, 
+            focus: "growth, best performing posts, current trends, improvement suggestions" 
           }),
         });
         const data = await res.json();
         analyses.push({ platform: "Instagram", ...data });
       }
-
       if (xUsername) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analyze-profile`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            profile: xUsername,
-            focus: "growth, best performing posts, current trends, improvement suggestions"
+          body: JSON.stringify({ 
+            profile: xUsername, 
+            focus: "growth, best performing posts, current trends, improvement suggestions" 
           }),
         });
         const data = await res.json();
         analyses.push({ platform: "x/X", ...data });
       }
-
       if (fbPage) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analyze-profile`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            profile: fbPage,
-            focus: "growth, best performing posts, current trends, improvement suggestions"
+          body: JSON.stringify({ 
+            profile: fbPage, 
+            focus: "growth, best performing posts, current trends, improvement suggestions" 
           }),
         });
         const data = await res.json();
@@ -131,21 +123,18 @@ export default function Home() {
       alert(`✅ Analysis completed for ${analyses.length} profile(s)!`);
       
       if (analyses.length > 0) {
-        append({ 
-          role: "user", 
-          content: `Here is the analysis for ${igUsername || xUsername || fbPage}` 
-        });
+        append({ role: "user", content: `Here is the analysis for ${igUsername || xUsername || fbPage}` });
       }
     } catch (error) {
       console.error(error);
-      alert("Failed to analyze accounts. Make sure the backend is running on port 8001.");
+      alert("Failed to analyze accounts. Make sure backend is running.");
     }
     setIsProcessing(false);
   };
 
   const handleAnalyzePosts = async () => {
     if (!postInput.trim()) {
-      alert("Please enter at least one Instagram reel URL or shortcode");
+      alert("Please enter at least one Instagram post URL or shortcode");
       return;
     }
 
@@ -158,19 +147,24 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           shortcodes: shortcodeList,
-          focus: "engagement comparison, best performing, improvement suggestions"
+          focus: "engagement comparison, best performing, improvement suggestions",
+          post_type: postType
         }),
       });
       
       const data = await res.json();
       
-      setLastAnalysis([{ platform: "Instagram Posts", ...data }]);
-      alert(`✅ Analyzed ${shortcodeList.length} post(s)!`);
+      setLastAnalysis([{ 
+        platform: `Instagram ${postType === "reels" ? "Reels" : "Posts"}`, 
+        ...data 
+      }]);
+      
+      alert(`✅ Analyzed ${shortcodeList.length} ${postType === "reels" ? "Reels" : "Posts"}!`);
       
       if (data.success) {
         append({ 
           role: "user", 
-          content: `Here is the analysis for posts: ${shortcodeList.join(", ")}` 
+          content: `Here is the analysis for ${postType === "reels" ? "Reels" : "Posts"}: ${shortcodeList.join(", ")}` 
         });
       }
     } catch (error) {
@@ -194,7 +188,7 @@ export default function Home() {
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "24px", marginBottom: "32px", border: "2px solid #27272a", backgroundColor: "#09090b" }}>
         <div>
           <h1 style={{ fontSize: "32px", fontWeight: 900, margin: 0 }}>SOCIAL GROWTH OS</h1>
-          <p style={{ fontSize: "12px", color: "#a1a1aa", marginTop: "4px" }}>MULTI-PLATFORM AI STRATEGIST • POWERED BY GEMINI + DUCKDUCKGO</p>
+          <p style={{ fontSize: "12px", color: "#a1a1aa", marginTop: "4px" }}>MULTI-PLATFORM AI STRATEGIST</p>
         </div>
         <div style={{ padding: "8px 16px", backgroundColor: "#18181b", border: "1px solid #27272a", fontSize: "12px" }}>
           SYSTEM ONLINE
@@ -240,39 +234,49 @@ export default function Home() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
             <div>
               <label style={{ display: "block", fontSize: "11px", color: "#a1a1aa", marginBottom: "8px" }}>INSTAGRAM USERNAME</label>
-              <input
-                type="text"
-                placeholder="@yourhandle"
-                value={igUsername}
-                onChange={(e) => setIgUsername(e.target.value)}
-                style={{ width: "100%", padding: "14px", background: "#000", border: "1px solid #27272a", color: "white" }}
-              />
+              <input type="text" placeholder="@yourhandle" value={igUsername} onChange={(e) => setIgUsername(e.target.value)} style={{ width: "100%", padding: "14px", background: "#000", border: "1px solid #27272a", color: "white" }} />
             </div>
             <div>
               <label style={{ display: "block", fontSize: "11px", color: "#a1a1aa", marginBottom: "8px" }}>x / TWITTER USERNAME</label>
-              <input
-                type="text"
-                placeholder="@yourhandle"
-                value={xUsername}
-                onChange={(e) => setxUsername(e.target.value)}
-                style={{ width: "100%", padding: "14px", background: "#000", border: "1px solid #27272a", color: "white" }}
-              />
+              <input type="text" placeholder="@yourhandle" value={xUsername} onChange={(e) => setxUsername(e.target.value)} style={{ width: "100%", padding: "14px", background: "#000", border: "1px solid #27272a", color: "white" }} />
             </div>
             <div>
               <label style={{ display: "block", fontSize: "11px", color: "#a1a1aa", marginBottom: "8px" }}>FACEBOOK PAGE NAME</label>
-              <input
-                type="text"
-                placeholder="YourPageName"
-                value={fbPage}
-                onChange={(e) => setFbPage(e.target.value)}
-                style={{ width: "100%", padding: "14px", background: "#000", border: "1px solid #27272a", color: "white" }}
-              />
+              <input type="text" placeholder="YourPageName" value={fbPage} onChange={(e) => setFbPage(e.target.value)} style={{ width: "100%", padding: "14px", background: "#000", border: "1px solid #27272a", color: "white" }} />
             </div>
           </div>
         ) : (
           <div>
+            <label style={{ display: "block", fontSize: "11px", color: "#a1a1aa", marginBottom: "8px" }}>POST TYPE</label>
+            <div style={{ display: "flex", gap: "10px", marginBottom: "16px" }}>
+              <button 
+                onClick={() => setPostType("reels")} 
+                style={{ 
+                  padding: "8px 20px", 
+                  background: postType === "reels" ? "#fff" : "#18181b", 
+                  color: postType === "reels" ? "#000" : "#fff", 
+                  border: "1px solid #27272a", 
+                  borderRadius: "6px" 
+                }}
+              >
+                🎥 Reels Only
+              </button>
+              <button 
+                onClick={() => setPostType("all")} 
+                style={{ 
+                  padding: "8px 20px", 
+                  background: postType === "all" ? "#fff" : "#18181b", 
+                  color: postType === "all" ? "#000" : "#fff", 
+                  border: "1px solid #27272a", 
+                  borderRadius: "6px" 
+                }}
+              >
+                📸 All Posts
+              </button>
+            </div>
+
             <label style={{ display: "block", fontSize: "11px", color: "#a1a1aa", marginBottom: "8px" }}>
-              INSTAGRAM REEL URLS OR SHORTCODES (comma separated)
+              INSTAGRAM POST URLS OR SHORTCODES (comma separated)
             </label>
             <input
               type="text"
@@ -282,25 +286,21 @@ export default function Home() {
               style={{ width: "100%", padding: "14px", background: "#000", border: "1px solid #27272a", color: "white", marginBottom: "12px" }}
             />
             <p style={{ fontSize: "12px", color: "#a1a1aa" }}>
-              You can paste full reel URLs or just the shortcodes.<br />
-              Example: <strong>DZNdBTogxVy, DZF_g8Oybox</strong>
+              You can paste full URLs or shortcodes.
             </p>
           </div>
         )}
 
         <button
           onClick={mode === "accounts" ? handleAnalyzeAccounts : handleAnalyzePosts}
-          disabled={isProcessing || (mode === "accounts" 
-            ? (!igUsername && !xUsername && !fbPage) 
-            : !postInput.trim())}
+          disabled={isProcessing || (mode === "accounts" ? (!igUsername && !xUsername && !fbPage) : !postInput.trim())}
           style={{ marginTop: "20px", padding: "14px 32px", background: "#fff", color: "#000", fontWeight: "bold", border: "none" }}
         >
-          {isProcessing ? "ANALYZING..." : mode === "accounts" ? "ANALYZE ALL ACCOUNTS" : "COMPARE POSTS"}
+          {isProcessing ? "ANALYZING..." : mode === "accounts" ? "ANALYZE ALL ACCOUNTS" : `COMPARE ${postType === "reels" ? "REELS" : "POSTS"}`}
         </button>
       </section>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
-        {/* Performance Overview */}
         <section style={{ border: "2px solid #27272a", padding: "24px", backgroundColor: "#09090b" }}>
           <h2 style={{ fontSize: "20px", marginBottom: "20px" }}>📈 LATEST ANALYSIS</h2>
           {lastAnalysis ? (
@@ -316,12 +316,11 @@ export default function Home() {
             </div>
           ) : (
             <div style={{ color: "#52525b", padding: "60px 0", textAlign: "center" }}>
-              Enter usernames or post URLs above and click Analyze
+              Select mode and enter data above
             </div>
           )}
         </section>
 
-        {/* Chat Interface */}
         <section style={{ border: "2px solid #27272a", backgroundColor: "#09090b", height: "720px", display: "flex", flexDirection: "column" }}>
           <div style={{ padding: "16px 20px", borderBottom: "1px solid #27272a", backgroundColor: "#000" }}>
             <span style={{ fontWeight: "bold" }}>💡 GROWTH STRATEGIST CHAT</span>
@@ -379,7 +378,6 @@ export default function Home() {
         </section>
       </div>
 
-      {/* Quick Prompts */}
       <div style={{ marginTop: "32px", border: "2px solid #27272a", padding: "20px", backgroundColor: "#09090b" }}>
         <h3 style={{ marginBottom: "12px", fontSize: "14px" }}>QUICK INSIGHTS</h3>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
