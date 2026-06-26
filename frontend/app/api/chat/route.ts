@@ -10,7 +10,6 @@ export async function POST(req: Request) {
     content: m.content,
   }));
 
-  // Use environment variable (very important on Render)
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
 
   const response = await fetch(`${backendUrl}/api/chat`, {
