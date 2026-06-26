@@ -58,13 +58,16 @@ async def chat_endpoint(payload: ChatPayload):
         retriever = vector_store.as_retriever(search_kwargs={"k": 4})
         
         template = """You are an expert social media growth strategist.
-        Use the following previous analyses and context to answer the user's question naturally.
+        Use the following previous analyses and context to answer the user's question.
 
         Context:
         {context}
 
         Question: {question}
-        """
+
+        Important: Respond with clean, natural English paragraphs and bullet points only.
+        Do NOT output JSON, code blocks, or any technical formatting.
+        Just write like a normal helpful AI assistant."""
 
         prompt = ChatPromptTemplate.from_template(template)
 
