@@ -7,6 +7,11 @@ import uvicorn
 from dotenv import load_dotenv
 import os
 
+# LangChain imports for chat
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
+
 load_dotenv()
 
 app = FastAPI(title="Social Growth OS")
