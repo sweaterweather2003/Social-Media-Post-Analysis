@@ -1,4 +1,3 @@
-# /home/workdir/attachments/extractors.py
 import datetime
 import time
 from typing import Dict, List
@@ -51,7 +50,6 @@ def get_instagram_profile_posts(username: str, max_posts: int = 12) -> List[Dict
             time.sleep(1)
     except Exception as e:
         print(f"⚠️ Instagram error: {e}")
-        # Safe fallback so we don't crash
         posts = [{
             "post_id": "demo",
             "platform": "Instagram",
@@ -71,6 +69,14 @@ def get_instagram_profile_posts(username: str, max_posts: int = 12) -> List[Dict
         }]
     
     return posts
+
+
+# Placeholder functions (you can implement later)
+def get_twitter_profile_posts(username: str, max_posts: int = 10) -> List[Dict]:
+    return []  # TODO: Implement with snscrape or Twitter API
+
+def get_facebook_page_posts(page: str, max_posts: int = 10) -> List[Dict]:
+    return []  # TODO: Implement
 
 
 def get_all_platform_posts(instagram_username: str, twitter_username: str = "", facebook_page: str = ""):
