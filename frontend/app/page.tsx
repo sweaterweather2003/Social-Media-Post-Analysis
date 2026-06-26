@@ -38,7 +38,7 @@ export default function Home() {
   const [igUsername, setIgUsername] = useState("");
   const [xUsername, setxUsername] = useState("");
   const [fbPage, setFbPage] = useState("");
-  const [postShortcodes, setPostShortcodes] = useState("");
+  const [postInput, setPostInput] = useState("");
   const [mode, setMode] = useState<"accounts" | "posts">("accounts");
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastAnalysis, setLastAnalysis] = useState<any>(null);
@@ -60,6 +60,23 @@ export default function Home() {
     "Give me a full growth strategy for the next 14 days",
     "Compare my Instagram vs x performance",
   ];
+
+  // Helper to extract shortcode from URL or use direct shortcode
+  const extractShortcode = (input: string): string[] => {
+    return input.split(',').map(item => {
+      const trimmed = item.trim();
+      if (!trimmed) return null;
+      
+      // Handle full Instagram URL
+      const urlMatch = trimmed.match(/instagram\.com\/reel\/([A-Za-z0-9_-]+)/);
+      if (urlMatch && urlMatch[1]) {
+        return urlMatch[1];
+      }
+      
+      // Return as shortcode if it looks like one
+      return trimmed;
+    }).filter(Boolean) as string[];
+  };
 
   const handleAnalyzeAccounts = async () => {
     if (!igUsername && !xUsername && !fbPage) {
@@ -127,13 +144,13 @@ export default function Home() {
   };
 
   const handleAnalyzePosts = async () => {
-    if (!postShortcodes.trim()) {
-      alert("Please enter at least one Instagram shortcode");
+    if (!postInput.trim()) {
+      alert("Please enter at least one Instagram reel URL or shortcode");
       return;
     }
 
     setIsProcessing(true);
-    const shortcodeList = postShortcodes.split(',').map(s => s.trim());
+    const shortcodeList = extractShortcode(postInput);
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analyze-posts`, {
@@ -148,7 +165,7 @@ export default function Home() {
       const data = await res.json();
       
       setLastAnalysis([{ platform: "Instagram Posts", ...data }]);
-      alert(`✅ Analyzed ${shortcodeList.length} posts!`);
+      alert(`✅ Analyzed ${shortcodeList.length} post(s)!`);
       
       if (data.success) {
         append({ 
@@ -255,17 +272,18 @@ export default function Home() {
         ) : (
           <div>
             <label style={{ display: "block", fontSize: "11px", color: "#a1a1aa", marginBottom: "8px" }}>
-              INSTAGRAM REEL SHORTCODES (comma separated)
+              INSTAGRAM REEL URLS OR SHORTCODES (comma separated)
             </label>
             <input
               type="text"
-              placeholder="ABC123, DEF456, GHI789"
-              value={postShortcodes}
-              onChange={(e) => setPostShortcodes(e.target.value)}
+              placeholder="https://www.instagram.com/reel/DZNdBTogxVy/ or DZNdBTogxVy"
+              value={postInput}
+              onChange={(e) => setPostInput(e.target.value)}
               style={{ width: "100%", padding: "14px", background: "#000", border: "1px solid #27272a", color: "white", marginBottom: "12px" }}
             />
             <p style={{ fontSize: "12px", color: "#a1a1aa" }}>
-              Example: Copy shortcode from reel URL → https://www.instagram.com/reel/<strong>ABC123</strong>/
+              You can paste full reel URLs or just the shortcodes.<br />
+              Example: <strong>DZNdBTogxVy, DZF_g8Oybox</strong>
             </p>
           </div>
         )}
@@ -274,7 +292,7 @@ export default function Home() {
           onClick={mode === "accounts" ? handleAnalyzeAccounts : handleAnalyzePosts}
           disabled={isProcessing || (mode === "accounts" 
             ? (!igUsername && !xUsername && !fbPage) 
-            : !postShortcodes.trim())}
+            : !postInput.trim())}
           style={{ marginTop: "20px", padding: "14px 32px", background: "#fff", color: "#000", fontWeight: "bold", border: "none" }}
         >
           {isProcessing ? "ANALYZING..." : mode === "accounts" ? "ANALYZE ALL ACCOUNTS" : "COMPARE POSTS"}
@@ -298,7 +316,7 @@ export default function Home() {
             </div>
           ) : (
             <div style={{ color: "#52525b", padding: "60px 0", textAlign: "center" }}>
-              Enter usernames or post shortcodes above and click Analyze
+              Enter usernames or post URLs above and click Analyze
             </div>
           )}
         </section>
