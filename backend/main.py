@@ -7,7 +7,7 @@ import uvicorn
 from dotenv import load_dotenv
 import os
 
-# LangChain imports for chat
+# LangChain imports
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
@@ -40,11 +40,7 @@ class ChatPayload(BaseModel):
 async def analyze(payload: ProfilePayload):
     try:
         result = analyze_profile(payload.profile, payload.focus)
-        return {
-            "success": True,
-            "analysis": result,
-            "profile": payload.profile
-        }
+        return {"success": True, "analysis": result, "profile": payload.profile}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -52,11 +48,7 @@ async def analyze(payload: ProfilePayload):
 async def analyze_posts_endpoint(payload: PostsPayload):
     try:
         result = analyze_posts(payload.shortcodes, payload.focus)
-        return {
-            "success": True,
-            "analysis": result,
-            "shortcodes": payload.shortcodes
-        }
+        return {"success": True, "analysis": result, "shortcodes": payload.shortcodes}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -66,7 +58,7 @@ async def chat_endpoint(payload: ChatPayload):
         retriever = vector_store.as_retriever(search_kwargs={"k": 4})
         
         template = """You are an expert social media growth strategist.
-        Use the following previous analyses and context to answer the user's question.
+        Use the following previous analyses and context to answer the user's question naturally.
 
         Context:
         {context}
