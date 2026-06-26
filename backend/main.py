@@ -2,12 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict
-from rag_engine import analyze_profile, vector_store, llm
+from rag_engine import analyze_profile, analyze_posts, vector_store, llm
 import uvicorn
 from dotenv import load_dotenv
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough
-from langchain_core.output_parsers import StrOutputParser
+import os
 
 load_dotenv()
 
@@ -25,6 +23,10 @@ class ProfilePayload(BaseModel):
     profile: str
     focus: str = "growth, best performing posts, current trends, improvement suggestions"
 
+class PostsPayload(BaseModel):
+    shortcodes: List[str]
+    focus: str = "engagement comparison, best performing, improvement suggestions"
+
 class ChatPayload(BaseModel):
     question: str
     chat_history: List[Dict[str, str]] = []
@@ -37,6 +39,18 @@ async def analyze(payload: ProfilePayload):
             "success": True,
             "analysis": result,
             "profile": payload.profile
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/analyze-posts")
+async def analyze_posts_endpoint(payload: PostsPayload):
+    try:
+        result = analyze_posts(payload.shortcodes, payload.focus)
+        return {
+            "success": True,
+            "analysis": result,
+            "shortcodes": payload.shortcodes
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -75,4 +89,4 @@ async def health():
     return {"status": "ok"}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8001)) )
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8001)))
