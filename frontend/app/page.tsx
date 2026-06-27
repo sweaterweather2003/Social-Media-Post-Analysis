@@ -48,7 +48,7 @@ export default function Home() {
     api: "/api/chat",
   });
 
-  const chatSectionRef = useRef<HTMLDivElement>(null); // New: Scroll to chat box
+  const chatSectionRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const hasInteracted = useRef(false);
 
@@ -126,7 +126,6 @@ export default function Home() {
       setLastAnalysis(analyses);
       alert(`✅ Analysis completed for ${analyses.length} profile(s)!`);
       
-      // Scroll to chat section after analysis
       setTimeout(() => {
         chatSectionRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 300);
@@ -170,7 +169,6 @@ export default function Home() {
       
       alert(`✅ Analyzed ${shortcodeList.length} ${postType === "reels" ? "Reels" : "Posts"}!`);
       
-      // Scroll to chat section after analysis
       setTimeout(() => {
         chatSectionRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 300);
@@ -320,27 +318,46 @@ export default function Home() {
       </section>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
-        <section style={{ border: "2px solid #27272a", padding: "24px", backgroundColor: "#09090b" }}>
-          <h2 style={{ fontSize: "20px", marginBottom: "20px" }}>📈 LATEST ANALYSIS</h2>
-          {lastAnalysis ? (
-            <div style={{ fontSize: "13px", maxHeight: "600px", overflowY: "auto" }}>
-              {lastAnalysis.map((item: any, index: number) => (
-                <div key={index} style={{ marginBottom: "20px", padding: "12px", border: "1px solid #27272a" }}>
-                  <strong>{item.platform}:</strong>
-                  <div style={{ marginTop: "8px", color: "#a1a1aa", whiteSpace: "pre-wrap" }}>
-                    {item.analysis ? item.analysis.substring(0, 400) + "..." : "Analysis completed"}
+        {/* Latest Analysis + Quick Insights (Left Column) */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          <section style={{ border: "2px solid #27272a", padding: "24px", backgroundColor: "#09090b" }}>
+            <h2 style={{ fontSize: "20px", marginBottom: "20px" }}>📈 LATEST ANALYSIS</h2>
+            {lastAnalysis ? (
+              <div style={{ fontSize: "13px", maxHeight: "500px", overflowY: "auto" }}>
+                {lastAnalysis.map((item: any, index: number) => (
+                  <div key={index} style={{ marginBottom: "20px", padding: "12px", border: "1px solid #27272a" }}>
+                    <strong>{item.platform}:</strong>
+                    <div style={{ marginTop: "8px", color: "#a1a1aa", whiteSpace: "pre-wrap" }}>
+                      {item.analysis ? item.analysis.substring(0, 400) + "..." : "Analysis completed"}
+                    </div>
                   </div>
-                </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ color: "#52525b", padding: "60px 0", textAlign: "center" }}>
+                Select mode and enter data above
+              </div>
+            )}
+          </section>
+
+          {/* Quick Insights - Now below Latest Analysis */}
+          <div style={{ border: "2px solid #27272a", padding: "20px", backgroundColor: "#09090b" }}>
+            <h3 style={{ marginBottom: "12px", fontSize: "14px" }}>QUICK INSIGHTS</h3>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+              {quickPrompts.map((prompt, i) => (
+                <button
+                  key={i}
+                  onClick={() => append({ role: "user", content: prompt })}
+                  style={{ padding: "10px 16px", background: "#18181b", border: "1px solid #27272a", fontSize: "13px", cursor: "pointer" }}
+                >
+                  {prompt}
+                </button>
               ))}
             </div>
-          ) : (
-            <div style={{ color: "#52525b", padding: "60px 0", textAlign: "center" }}>
-              Select mode and enter data above
-            </div>
-          )}
-        </section>
+          </div>
+        </div>
 
-        {/* Chat Section with Ref */}
+        {/* Chat Section */}
         <section ref={chatSectionRef} style={{ border: "2px solid #27272a", backgroundColor: "#09090b", height: "720px", display: "flex", flexDirection: "column" }}>
           <div style={{ padding: "16px 20px", borderBottom: "1px solid #27272a", backgroundColor: "#000" }}>
             <span style={{ fontWeight: "bold" }}>💡 GROWTH STRATEGIST CHAT</span>
@@ -396,21 +413,6 @@ export default function Home() {
             </button>
           </form>
         </section>
-      </div>
-
-      <div style={{ marginTop: "32px", border: "2px solid #27272a", padding: "20px", backgroundColor: "#09090b" }}>
-        <h3 style={{ marginBottom: "12px", fontSize: "14px" }}>QUICK INSIGHTS</h3>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-          {quickPrompts.map((prompt, i) => (
-            <button
-              key={i}
-              onClick={() => append({ role: "user", content: prompt })}
-              style={{ padding: "10px 16px", background: "#18181b", border: "1px solid #27272a", fontSize: "13px", cursor: "pointer" }}
-            >
-              {prompt}
-            </button>
-          ))}
-        </div>
       </div>
     </main>
   );
