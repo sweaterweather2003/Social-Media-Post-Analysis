@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 
 from dotenv import load_dotenv
@@ -16,46 +16,103 @@ from extractors import get_instagram_profile_posts, get_instagram_posts_by_short
 load_dotenv()
 backend_dir = Path(__file__).resolve().parent
 
-if not os.getenv("GOOGLE_API_KEY"):
-    raise ValueError("CRITICAL ERROR: GOOGLE_API_KEY is missing from your .env file!")
+# ====================== MULTIPLE GOOGLE API KEYS ======================
+GOOGLE_API_KEYS = [
+    os.getenv("GOOGLE_API_KEY"),
+    os.getenv("GOOGLE_API_KEY_2"),
+    os.getenv("GOOGLE_API_KEY_3"),
+    os.getenv("GOOGLE_API_KEY_4"),
+]
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.4)
-embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-2-preview")
+current_key_index = 0
+last_rotation_date = datetime.now().date()
+all_keys_exhausted_until = None
+
+def get_next_api_key() -> str:
+    global current_key_index, last_rotation_date, all_keys_exhausted_until
+    
+    today = datetime.now().date()
+    if today > last_rotation_date:
+        current_key_index = 0
+        all_keys_exhausted_until = None
+        last_rotation_date = today
+
+    for _ in range(len(GOOGLE_API_KEYS)):
+        key = GOOGLE_API_KEYS[current_key_index]
+        if key and key.strip():
+            return key.strip()
+        current_key_index = (current_key_index + 1) % len(GOOGLE_API_KEYS)
+    
+    # All keys exhausted
+    if not all_keys_exhausted_until:
+        all_keys_exhausted_until = datetime.now() + timedelta(hours=12)
+    
+    raise Exception("ALL_API_KEYS_EXHAUSTED")
+
+
+def create_llm():
+    try:
+        key = get_next_api_key()
+        print(f"🔑 Using API Key ending with ...{key[-8:]}")
+        return ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
+            temperature=0.4,
+            google_api_key=key
+        )
+    except Exception as e:
+        if "ALL_API_KEYS_EXHAUSTED" in str(e):
+            raise Exception("ALL_API_KEYS_EXHAUSTED")
+        raise e
+
+
+def create_embeddings():
+    key = get_next_api_key()
+    return GoogleGenerativeAIEmbeddings(
+        model="gemini-embedding-2-preview",
+        google_api_key=key
+    )
+
+
+llm = create_llm()
+embeddings = create_embeddings()
 
 vector_store = Chroma(
     embedding_function=embeddings, 
     persist_directory=str(backend_dir / "chroma_db_gemini")
 )
 
+# ====================== ANALYZE POSTS ======================
 def analyze_posts(shortcodes: List[str], focus: str = "engagement comparison, best performing, improvement suggestions", post_type: str = "reels"):
-    print(f"🔍 Analyzing {len(shortcodes)} Instagram posts (type: {post_type})")
-    
     try:
-        posts = get_instagram_posts_by_shortcodes(shortcodes)
-        print(f"✅ Fetched {len(posts)} posts")
-    except Exception as e:
-        print(f"⚠️ Failed to fetch posts: {e}")
-        posts = []
+        print(f"🔍 Analyzing {len(shortcodes)} Instagram posts (type: {post_type})")
+        
+        try:
+            posts = get_instagram_posts_by_shortcodes(shortcodes)
+            print(f"✅ Fetched {len(posts)} posts")
+        except Exception as e:
+            print(f"⚠️ Failed to fetch posts: {e}")
+            posts = []
 
-    posts_details = []
-    for i, p in enumerate(posts):
-        full_caption = p.get('transcript', 'No caption available.')
-        post_label = "Reel" if p.get('post_type') == 'reel' else "Post"
-        posts_details.append(f"""
+        posts_details = []
+        for i, p in enumerate(posts):
+            full_caption = p.get('transcript', 'No caption available.')
+            post_label = "Reel" if p.get('post_type') == 'reel' else "Post"
+            posts_details.append(f"""
 {post_label} {i+1}:
 Title: {p.get('title', 'No title')}
-Views: {p.get('views', 0)} | Likes: {p.get('likes', 0)} | Comments: {p.get('comments', 0)} | Engagement: {p.get('engagement_rate', 0)}%
+Views: {p.get('views', 0)} | Likes: {p.get('likes', 0)} | 
+Comments: {p.get('comments', 0)} | Engagement: {p.get('engagement_rate', 0)}%
 
 FULL VERBATIM CAPTION:
 {full_caption}
 """)
 
-    posts_summary = "\n".join(posts_details)
+        posts_summary = "\n".join(posts_details)
 
-    prompt = f"""
+        prompt = f"""
 You are a professional social media growth strategist.
 
-Here is the complete data for the Instagram {post_type} the user asked about:
+Here is the complete data for the Instagram {post_type}:
 
 {posts_summary}
 
@@ -76,45 +133,54 @@ Then provide your professional analysis:
 Write naturally and professionally.
 """
 
-    response = llm.invoke(prompt)
-    result = response.content if hasattr(response, 'content') else str(response)
-    
-    doc = Document(
-        page_content=result,
-        metadata={"type": "posts_analysis", "timestamp": datetime.now().isoformat()}
-    )
-    splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
-    chunks = splitter.split_documents([doc])
-    vector_store.add_documents(chunks)
-    
-    return result
+        response = llm.invoke(prompt)
+        result = response.content if hasattr(response, 'content') else str(response)
+        
+        doc = Document(
+            page_content=result,
+            metadata={"type": "posts_analysis", "timestamp": datetime.now().isoformat()}
+        )
+        splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+        chunks = splitter.split_documents([doc])
+        vector_store.add_documents(chunks)
+        
+        return result
+
+    except Exception as e:
+        if "ALL_API_KEYS_EXHAUSTED" in str(e):
+            reset_time = all_keys_exhausted_until.strftime("%I:%M %p")
+            return f"⚠️ All API keys have reached their daily limit.\n\nPlease try again after **{reset_time}** (in about 12 hours)."
+        else:
+            return f"Error: {str(e)}"
 
 
+# ====================== ANALYZE PROFILE ======================
 def analyze_profile(profile_handle: str, focus: str = "growth, best posts, trends, suggestions"):
-    print(f"🔍 Analyzing profile: {profile_handle}")
-    
     try:
-        posts = get_instagram_profile_posts(profile_handle, max_posts=12)
-        print(f"✅ Fetched {len(posts)} posts from Instagram")
-    except Exception as e:
-        print(f"⚠️ Failed to fetch posts: {e}")
-        posts = []
+        print(f"🔍 Analyzing profile: {profile_handle}")
+        
+        try:
+            posts = get_instagram_profile_posts(profile_handle, max_posts=12)
+            print(f"✅ Fetched {len(posts)} posts from Instagram")
+        except Exception as e:
+            print(f"⚠️ Failed to fetch posts: {e}")
+            posts = []
 
-    search = DuckDuckGoSearchRun()
-    search_query = f"{profile_handle} instagram reels best performing content OR trends 2026"
-    try:
-        search_results = search.run(search_query)
-    except Exception as e:
-        print(f"⚠️ Search failed: {e}")
-        search_results = "No additional search results available."
+        search = DuckDuckGoSearchRun()
+        search_query = f"{profile_handle} instagram reels best performing content OR trends 2026"
+        try:
+            search_results = search.run(search_query)
+        except Exception as e:
+            print(f"⚠️ Search failed: {e}")
+            search_results = "No additional search results available."
 
-    posts_summary = "\n".join([
-        f"- {p.get('title', 'Untitled')} | Views: {p.get('views', 0)} | Likes: {p.get('likes', 0)} | "
-        f"Comments: {p.get('comments', 0)} | Engagement: {p.get('engagement_rate', 0)}% | Date: {p.get('upload_date')}"
-        for p in posts[:10]
-    ]) if posts else "No posts were fetched."
+        posts_summary = "\n".join([
+            f"- {p.get('title', 'Untitled')} | Views: {p.get('views', 0)} | Likes: {p.get('likes', 0)} | "
+            f"Comments: {p.get('comments', 0)} | Engagement: {p.get('engagement_rate', 0)}% | Date: {p.get('upload_date')}"
+            for p in posts[:10]
+        ]) if posts else "No posts were fetched."
 
-    prompt = f"""
+        prompt = f"""
 You are a top social media growth strategist in 2026. Speak naturally.
 
 Profile: @{profile_handle}
@@ -129,18 +195,25 @@ Additional Web Context:
 Provide a clear, natural, and actionable response.
 """
 
-    response = llm.invoke(prompt)
-    result = response.content if hasattr(response, 'content') else str(response)
-    
-    doc = Document(
-        page_content=result,
-        metadata={"profile": profile_handle, "type": "profile_analysis", "timestamp": datetime.now().isoformat()}
-    )
-    splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
-    chunks = splitter.split_documents([doc])
-    vector_store.add_documents(chunks)
-    
-    return result
+        response = llm.invoke(prompt)
+        result = response.content if hasattr(response, 'content') else str(response)
+        
+        doc = Document(
+            page_content=result,
+            metadata={"profile": profile_handle, "type": "profile_analysis", "timestamp": datetime.now().isoformat()}
+        )
+        splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+        chunks = splitter.split_documents([doc])
+        vector_store.add_documents(chunks)
+        
+        return result
+
+    except Exception as e:
+        if "ALL_API_KEYS_EXHAUSTED" in str(e):
+            reset_time = all_keys_exhausted_until.strftime("%I:%M %p")
+            return f"⚠️ All API keys have reached their daily limit.\n\nPlease try again after **{reset_time}**."
+        else:
+            return f"Error: {str(e)}"
 
 
 __all__ = ["analyze_profile", "analyze_posts", "vector_store", "llm"]
