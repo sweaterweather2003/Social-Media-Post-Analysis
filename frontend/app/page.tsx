@@ -49,10 +49,20 @@ export default function Home() {
   });
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const hasInteracted = useRef(false); // New: Track if user has used the chat
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Only auto-scroll if user has sent a message or is loading
+    if (hasInteracted.current || messages.length > 0 || isLoading) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, isLoading]);
+
+  // Mark that user has interacted when they send a message
+  const handleSubmitWithInteraction = (e: React.FormEvent) => {
+    hasInteracted.current = true;
+    handleSubmit(e);
+  };
 
   const quickPrompts = [
     "What content performed best across platforms last 30 days?",
@@ -363,7 +373,7 @@ export default function Home() {
             <div ref={chatEndRef} />
           </div>
 
-          <form onSubmit={handleSubmit} style={{ padding: "16px", borderTop: "1px solid #27272a", display: "flex", gap: "8px" }}>
+          <form onSubmit={handleSubmitWithInteraction} style={{ padding: "16px", borderTop: "1px solid #27272a", display: "flex", gap: "8px" }}>
             <input
               type="text"
               value={input}
