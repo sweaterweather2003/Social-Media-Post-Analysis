@@ -48,6 +48,7 @@ export default function Home() {
     api: "/api/chat",
   });
 
+  const chatSectionRef = useRef<HTMLDivElement>(null); // New: Scroll to chat box
   const chatEndRef = useRef<HTMLDivElement>(null);
   const hasInteracted = useRef(false);
 
@@ -125,6 +126,11 @@ export default function Home() {
       setLastAnalysis(analyses);
       alert(`✅ Analysis completed for ${analyses.length} profile(s)!`);
       
+      // Scroll to chat section after analysis
+      setTimeout(() => {
+        chatSectionRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 300);
+
       if (analyses.length > 0) {
         append({ role: "user", content: `Here is the analysis for ${igUsername || xUsername || fbPage}` });
       }
@@ -164,6 +170,11 @@ export default function Home() {
       
       alert(`✅ Analyzed ${shortcodeList.length} ${postType === "reels" ? "Reels" : "Posts"}!`);
       
+      // Scroll to chat section after analysis
+      setTimeout(() => {
+        chatSectionRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 300);
+
       if (data.success) {
         append({ 
           role: "user", 
@@ -329,7 +340,8 @@ export default function Home() {
           )}
         </section>
 
-        <section style={{ border: "2px solid #27272a", backgroundColor: "#09090b", height: "720px", display: "flex", flexDirection: "column" }}>
+        {/* Chat Section with Ref */}
+        <section ref={chatSectionRef} style={{ border: "2px solid #27272a", backgroundColor: "#09090b", height: "720px", display: "flex", flexDirection: "column" }}>
           <div style={{ padding: "16px 20px", borderBottom: "1px solid #27272a", backgroundColor: "#000" }}>
             <span style={{ fontWeight: "bold" }}>💡 GROWTH STRATEGIST CHAT</span>
           </div>
