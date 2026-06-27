@@ -49,10 +49,9 @@ export default function Home() {
   });
 
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const hasInteracted = useRef(false); // Prevents auto-scroll on initial load
+  const hasInteracted = useRef(false);
 
   useEffect(() => {
-    // Only scroll if user has interacted with chat or there are messages
     if (hasInteracted.current || messages.length > 0 || isLoading) {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
@@ -178,7 +177,7 @@ export default function Home() {
     setIsProcessing(false);
   };
 
-  const handleSubmitWithInteraction = (e: React.FormEvent) => {
+  const handleSubmitWithInteraction = (e: React.FormEvent<HTMLFormElement>) => {
     hasInteracted.current = true;
     handleSubmit(e);
   };
