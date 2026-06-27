@@ -49,20 +49,14 @@ export default function Home() {
   });
 
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const hasInteracted = useRef(false); // New: Track if user has used the chat
+  const hasInteracted = useRef(false); // Prevents auto-scroll on initial load
 
   useEffect(() => {
-    // Only auto-scroll if user has sent a message or is loading
+    // Only scroll if user has interacted with chat or there are messages
     if (hasInteracted.current || messages.length > 0 || isLoading) {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, isLoading]);
-
-  // Mark that user has interacted when they send a message
-  const handleSubmitWithInteraction = (e: React.FormEvent) => {
-    hasInteracted.current = true;
-    handleSubmit(e);
-  };
 
   const quickPrompts = [
     "What content performed best across platforms last 30 days?",
@@ -182,6 +176,11 @@ export default function Home() {
       alert("Failed to analyze posts. Make sure backend is running.");
     }
     setIsProcessing(false);
+  };
+
+  const handleSubmitWithInteraction = (e: React.FormEvent) => {
+    hasInteracted.current = true;
+    handleSubmit(e);
   };
 
   return (
