@@ -318,7 +318,7 @@ export default function Home() {
       </section>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
-        {/* Latest Analysis + Quick Insights (Left Column) */}
+        {/* Latest Analysis + Quick Insights */}
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           <section style={{ border: "2px solid #27272a", padding: "24px", backgroundColor: "#09090b" }}>
             <h2 style={{ fontSize: "20px", marginBottom: "20px" }}>📈 LATEST ANALYSIS</h2>
@@ -340,7 +340,7 @@ export default function Home() {
             )}
           </section>
 
-          {/* Quick Insights - Now below Latest Analysis */}
+          {/* Quick Insights - Below Latest Analysis */}
           <div style={{ border: "2px solid #27272a", padding: "20px", backgroundColor: "#09090b" }}>
             <h3 style={{ marginBottom: "12px", fontSize: "14px" }}>QUICK INSIGHTS</h3>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
@@ -348,7 +348,14 @@ export default function Home() {
                 <button
                   key={i}
                   onClick={() => append({ role: "user", content: prompt })}
-                  style={{ padding: "10px 16px", background: "#18181b", border: "1px solid #27272a", fontSize: "13px", cursor: "pointer" }}
+                  style={{ 
+                    padding: "10px 16px", 
+                    background: "#18181b", 
+                    border: "1px solid #27272a", 
+                    fontSize: "13px", 
+                    cursor: "pointer",
+                    color: "#ffffff"  // White text
+                  }}
                 >
                   {prompt}
                 </button>
