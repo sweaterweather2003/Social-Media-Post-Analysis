@@ -2,6 +2,11 @@
 import datetime
 import time
 from typing import Dict, List
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def calculate_engagement(likes: int, comments: int, views: int = 0) -> float:
     total = likes + comments
@@ -10,15 +15,34 @@ def calculate_engagement(likes: int, comments: int, views: int = 0) -> float:
     return round((total / max(total, 1)) * 100, 2) if total > 0 else 0.0
 
 
+def login_to_instagram(L):
+    """Login using credentials from .env"""
+    username = os.getenv("INSTAGRAM_USERNAME")
+    password = os.getenv("INSTAGRAM_PASSWORD")
+    
+    if username and password:
+        try:
+            L.login(username, password)
+            print(f"✅ Successfully logged in as {username}")
+            return True
+        except Exception as e:
+            print(f"⚠️ Login failed: {e}")
+            print("Continuing without login...")
+            return False
+    else:
+        print("⚠️ No Instagram credentials found in .env. Continuing without login.")
+        return False
+
+
 def get_instagram_post(shortcode: str) -> Dict:
     import instaloader
     L = instaloader.Instaloader()
     
-    # Improved headers
+    # Try to login
+    login_to_instagram(L)
+    
     L.context._session.headers.update({
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://www.instagram.com/",
     })
     
     try:
@@ -58,7 +82,7 @@ def get_instagram_post(shortcode: str) -> Dict:
             "likes": 0,
             "comments": 0,
             "engagement_rate": 0.0,
-            "transcript": f"⚠️ Could not fetch full data for this post.\n\nReason: Instagram is currently blocking automated access.\n\nTry these solutions:\n1. Make sure the post is public\n2. Wait 10-15 minutes and try again\n3. Use a different shortcode",
+            "transcript": f"⚠️ Could not fetch caption.\n\nInstagram is blocking access. Please make sure:\n1. The post is public\n2. Your credentials in .env are correct\n3. Try again in a few minutes",
             "url": f"https://www.instagram.com/p/{shortcode}/",
             "hashtags": [],
             "upload_date": datetime.datetime.now().strftime("%Y-%m-%d"),
@@ -72,9 +96,12 @@ def get_instagram_posts_by_shortcodes(shortcodes: List[str]) -> List[Dict]:
     return [get_instagram_post(code.strip()) for code in shortcodes if code.strip()]
 
 
+# Keep your profile function
 def get_instagram_profile_posts(username: str, max_posts: int = 12) -> List[Dict]:
     import instaloader
     L = instaloader.Instaloader()
+    login_to_instagram(L)
+    
     L.context._session.headers.update({
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     })
