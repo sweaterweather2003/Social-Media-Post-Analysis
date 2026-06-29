@@ -55,7 +55,7 @@ FULL VERBATIM CAPTION:
     prompt = f"""
 You are a professional social media growth strategist.
 
-Here is the complete data for the Instagram {post_type} the user asked about:
+Here is the complete data for the Instagram {post_type}:
 
 {posts_summary}
 
