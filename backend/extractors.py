@@ -1,4 +1,4 @@
-# /home/workdir/attachments/Social-Media-Post-Analysis-main/backend/extractors.py
+# backend/extractors.py
 import datetime
 import time
 from typing import Dict, List
@@ -75,7 +75,6 @@ def get_instagram_post(shortcode: str) -> Dict:
     L = instaloader.Instaloader()
     L.context._session.headers.update({
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
     })
     
     try:
@@ -114,7 +113,7 @@ def get_instagram_post(shortcode: str) -> Dict:
             "likes": 0,
             "comments": 0,
             "engagement_rate": 0.0,
-            "transcript": f"Could not fetch full data. Shortcode: {shortcode}",
+            "transcript": f"Could not fetch full data for this post. Shortcode: {shortcode}",
             "url": f"https://www.instagram.com/p/{shortcode}/",
             "hashtags": [],
             "upload_date": datetime.datetime.now().strftime("%Y-%m-%d"),
