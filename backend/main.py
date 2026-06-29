@@ -31,6 +31,7 @@ class ProfilePayload(BaseModel):
 class PostsPayload(BaseModel):
     shortcodes: List[str]
     focus: str = "engagement comparison, best performing, improvement suggestions"
+    post_type: str = "reels"
 
 class ChatPayload(BaseModel):
     question: str
@@ -47,7 +48,7 @@ async def analyze(payload: ProfilePayload):
 @app.post("/api/analyze-posts")
 async def analyze_posts_endpoint(payload: PostsPayload):
     try:
-        result = analyze_posts(payload.shortcodes, payload.focus)
+        result = analyze_posts(payload.shortcodes, payload.focus, payload.post_type)
         return {"success": True, "analysis": result, "shortcodes": payload.shortcodes}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -58,16 +59,15 @@ async def chat_endpoint(payload: ChatPayload):
         retriever = vector_store.as_retriever(search_kwargs={"k": 4})
         
         template = """You are an expert social media growth strategist.
-        Use the following previous analyses and context to answer the user's question.
+        Use the following previous analyses and context to answer the user's question naturally.
 
         Context:
         {context}
 
         Question: {question}
 
-        Important: Respond with clean, natural English paragraphs and bullet points only.
-        Do NOT output JSON, code blocks, or any technical formatting.
-        Just write like a normal helpful AI assistant."""
+        Respond with clean, natural English paragraphs and bullet points only.
+        Do NOT output JSON or technical formatting."""
 
         prompt = ChatPromptTemplate.from_template(template)
 
