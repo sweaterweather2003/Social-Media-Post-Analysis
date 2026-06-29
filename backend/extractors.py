@@ -134,3 +134,4 @@ def get_all_platform_posts(instagram_username: str, twitter_username: str = "", 
         "Twitter": [],
         "Facebook": []
     }
+
