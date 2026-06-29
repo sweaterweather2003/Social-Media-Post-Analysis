@@ -58,41 +58,13 @@ export default function Home() {
     }
   }, [messages, isLoading]);
 
-  // Dynamic Quick Insights based on context
-  const getDynamicQuickPrompts = () => {
-    if (lastAnalysis && lastAnalysis.length > 0) {
-      const platform = lastAnalysis[0].platform || "";
-      
-      if (platform.includes("Posts") || platform.includes("Reels")) {
-        return [
-          "Why did one post perform better than the other?",
-          "What should I improve in my next reels?",
-          "Suggest 5 new post ideas based on this analysis",
-          "What hashtags should I use next?",
-          "Compare these posts to trending content",
-        ];
-      } else if (platform.includes("Instagram")) {
-        return [
-          "What was my best performing post this month?",
-          "Suggest 5 content ideas for next week",
-          "How can I improve my engagement rate?",
-          "What hashtags are working right now?",
-          "Give me a 7-day growth plan",
-        ];
-      }
-    }
-
-    // Default prompts
-    return [
-      "What content performed best across platforms last 30 days?",
-      "Suggest 5 ideas for next week's posts to maximize engagement",
-      "Analyze top hashtags and trending patterns right now",
-      "Give me a full growth strategy for the next 14 days",
-      "Compare my Instagram vs x performance",
-    ];
-  };
-
-  const quickPrompts = getDynamicQuickPrompts();
+  const quickPrompts = [
+    "What content performed best across platforms last 30 days?",
+    "Suggest 5 ideas for next week's posts to maximize engagement",
+    "Analyze top hashtags and trending patterns right now",
+    "Give me a full growth strategy for the next 14 days",
+    "Compare my Instagram vs x performance",
+  ];
 
   const extractShortcode = (input: string): string[] => {
     return input.split(',').map(item => {
@@ -346,6 +318,7 @@ export default function Home() {
       </section>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
+        {/* Latest Analysis + Quick Insights (Left Column) */}
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           <section style={{ border: "2px solid #27272a", padding: "24px", backgroundColor: "#09090b" }}>
             <h2 style={{ fontSize: "20px", marginBottom: "20px" }}>📈 LATEST ANALYSIS</h2>
@@ -367,7 +340,7 @@ export default function Home() {
             )}
           </section>
 
-          {/* Dynamic Quick Insights */}
+          {/* Quick Insights - Now below Latest Analysis */}
           <div style={{ border: "2px solid #27272a", padding: "20px", backgroundColor: "#09090b" }}>
             <h3 style={{ marginBottom: "12px", fontSize: "14px" }}>QUICK INSIGHTS</h3>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
@@ -375,14 +348,7 @@ export default function Home() {
                 <button
                   key={i}
                   onClick={() => append({ role: "user", content: prompt })}
-                  style={{ 
-                    padding: "10px 16px", 
-                    background: "#18181b", 
-                    border: "1px solid #27272a", 
-                    fontSize: "13px", 
-                    cursor: "pointer",
-                    color: "#ffffff"
-                  }}
+                  style={{ padding: "10px 16px", background: "#18181b", border: "1px solid #27272a", fontSize: "13px", cursor: "pointer" }}
                 >
                   {prompt}
                 </button>
@@ -391,6 +357,7 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Chat Section */}
         <section ref={chatSectionRef} style={{ border: "2px solid #27272a", backgroundColor: "#09090b", height: "720px", display: "flex", flexDirection: "column" }}>
           <div style={{ padding: "16px 20px", borderBottom: "1px solid #27272a", backgroundColor: "#000" }}>
             <span style={{ fontWeight: "bold" }}>💡 GROWTH STRATEGIST CHAT</span>
