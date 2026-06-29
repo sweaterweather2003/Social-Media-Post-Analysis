@@ -41,10 +41,12 @@ def analyze_posts(shortcodes: List[str], focus: str = "engagement comparison, be
     for i, p in enumerate(posts):
         full_caption = p.get('transcript', 'No caption available.')
         post_label = "Reel" if p.get('post_type') == 'reel' else "Post"
+        
         posts_details.append(f"""
 {post_label} {i+1}:
 Title: {p.get('title', 'No title')}
-Views: {p.get('views', 0)} | Likes: {p.get('likes', 0)} | Comments: {p.get('comments', 0)} | Engagement: {p.get('engagement_rate', 0)}%
+Views: {p.get('views', 0)} | Likes: {p.get('likes', 0)} | 
+Comments: {p.get('comments', 0)} | Engagement: {p.get('engagement_rate', 0)}%
 
 FULL VERBATIM CAPTION:
 {full_caption}
@@ -55,25 +57,29 @@ FULL VERBATIM CAPTION:
     prompt = f"""
 You are a professional social media growth strategist.
 
-Here is the complete data for the Instagram {post_type} the user asked about:
+Here is the data for the Instagram content the user provided:
 
 {posts_summary}
 
-Respond in this exact structure:
+Respond using this exact structure:
 
 **1. Full Captions (Verbatim)**
 
-[Show the complete original caption for each post here exactly as it appears.]
+Paste the complete original captions exactly as they appear for each post. Do not summarize them here.
 
 **2. Analysis & Strategic Insights**
 
-Then provide your professional analysis:
+Then give your professional analysis:
 - Overall Performance Summary
 - What Worked Well
 - Areas for Improvement
 - Actionable Recommendations
 
-Write naturally and professionally.
+Important Rules:
+- Always show the full verbatim captions first, even if they say "Could not fetch full data".
+- Be honest about data limitations.
+- Write naturally and professionally.
+- Do not mention shortcodes in your final response unless absolutely necessary.
 """
 
     response = llm.invoke(prompt)
