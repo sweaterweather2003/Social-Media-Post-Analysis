@@ -43,6 +43,11 @@ async def analyze(payload: ProfilePayload):
         result = analyze_profile(payload.profile, payload.focus)
         return {"success": True, "analysis": result, "profile": payload.profile}
     except Exception as e:
+        if "ALL_API_KEYS_EXHAUSTED" in str(e):
+            return {
+                "success": False, 
+                "error": "All API keys have reached their daily limit. Please try again in about 12 hours."
+            }
         return {"success": False, "error": str(e)}
 
 @app.post("/api/analyze-posts")
@@ -51,6 +56,11 @@ async def analyze_posts_endpoint(payload: PostsPayload):
         result = analyze_posts(payload.shortcodes, payload.focus, payload.post_type)
         return {"success": True, "analysis": result, "shortcodes": payload.shortcodes}
     except Exception as e:
+        if "ALL_API_KEYS_EXHAUSTED" in str(e):
+            return {
+                "success": False, 
+                "error": "All API keys have reached their daily limit. Please try again in about 12 hours."
+            }
         return {"success": False, "error": str(e)}
 
 @app.post("/api/chat")
@@ -66,8 +76,7 @@ async def chat_endpoint(payload: ChatPayload):
 
         Question: {question}
 
-        Respond with clean, natural English paragraphs and bullet points only.
-        Do NOT output JSON or technical formatting."""
+        Respond in clean, natural English. Do not output JSON or technical formatting."""
 
         prompt = ChatPromptTemplate.from_template(template)
 
@@ -82,6 +91,10 @@ async def chat_endpoint(payload: ChatPayload):
         return {"response": response}
         
     except Exception as e:
+        if "ALL_API_KEYS_EXHAUSTED" in str(e):
+            return {
+                "response": "⚠️ All API keys have reached their daily limit.\n\nPlease try again in about 12 hours."
+            }
         return {"response": f"Sorry, I encountered an error: {str(e)}"}
 
 @app.get("/health")
