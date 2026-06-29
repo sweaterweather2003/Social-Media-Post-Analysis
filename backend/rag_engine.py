@@ -28,11 +28,10 @@ vector_store = Chroma(
 )
 
 def analyze_posts(shortcodes: List[str], focus: str = "engagement comparison, best performing, improvement suggestions", post_type: str = "reels"):
-    print(f"🔍 Analyzing {len(shortcodes)} Instagram posts (type: {post_type})")
+    print(f"🔍 Analyzing {len(shortcodes)} Instagram posts")
     
     try:
         posts = get_instagram_posts_by_shortcodes(shortcodes)
-        print(f"✅ Fetched {len(posts)} posts")
     except Exception as e:
         print(f"⚠️ Failed to fetch posts: {e}")
         posts = []
@@ -45,8 +44,7 @@ def analyze_posts(shortcodes: List[str], focus: str = "engagement comparison, be
         posts_details.append(f"""
 {post_label} {i+1}:
 Title: {p.get('title', 'No title')}
-Views: {p.get('views', 0)} | Likes: {p.get('likes', 0)} | 
-Comments: {p.get('comments', 0)} | Engagement: {p.get('engagement_rate', 0)}%
+Views: {p.get('views', 0)} | Likes: {p.get('likes', 0)} | Comments: {p.get('comments', 0)} | Engagement: {p.get('engagement_rate', 0)}%
 
 FULL VERBATIM CAPTION:
 {full_caption}
@@ -55,31 +53,31 @@ FULL VERBATIM CAPTION:
     posts_summary = "\n".join(posts_details)
 
     prompt = f"""
-You are a professional social media growth strategist.
+You are a helpful social media growth strategist.
 
-Here is the data for the Instagram content the user provided:
+Here is the available data for the Instagram content:
 
 {posts_summary}
 
-Respond using this exact structure:
+**Instructions:**
+- Always start with the **Full Captions (Verbatim)** section.
+- Show exactly what is in the "FULL VERBATIM CAPTION" field, even if it's a fallback message.
+- Then give your analysis.
+
+Respond in this exact format:
 
 **1. Full Captions (Verbatim)**
 
-Paste the complete original captions exactly as they appear for each post. Do not summarize them here.
+[Show each caption exactly as provided above]
 
 **2. Analysis & Strategic Insights**
 
-Then give your professional analysis:
 - Overall Performance Summary
 - What Worked Well
 - Areas for Improvement
 - Actionable Recommendations
 
-Important Rules:
-- Always show the full verbatim captions first, even if they say "Could not fetch full data".
-- Be honest about data limitations.
-- Write naturally and professionally.
-- Do not mention shortcodes in your final response unless absolutely necessary.
+Be honest if data is limited.
 """
 
     response = llm.invoke(prompt)
@@ -89,7 +87,7 @@ Important Rules:
         page_content=result,
         metadata={"type": "posts_analysis", "timestamp": datetime.now().isoformat()}
     )
-    splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
     chunks = splitter.split_documents([doc])
     vector_store.add_documents(chunks)
     
@@ -121,7 +119,7 @@ def analyze_profile(profile_handle: str, focus: str = "growth, best posts, trend
     ]) if posts else "No posts were fetched."
 
     prompt = f"""
-You are a top social media growth strategist in 2026. Speak naturally.
+You are a top social media growth strategist in 2026.
 
 Profile: @{profile_handle}
 Focus: {focus}
