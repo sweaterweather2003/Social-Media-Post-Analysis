@@ -2,6 +2,7 @@
 import datetime
 import time
 import asyncio
+import random
 from typing import Dict, List
 import os
 
@@ -17,7 +18,7 @@ def calculate_engagement(likes: int, comments: int, views: int = 0) -> float:
 
 
 async def scrape_with_playwright(shortcode: str) -> Dict:
-    """Advanced scraping using Playwright + Stealth"""
+    """Advanced scraping using Playwright + Persistent Context + Behavioral Emulation"""
     try:
         from playwright.async_api import async_playwright
         from playwright_stealth import stealth_async
@@ -26,10 +27,17 @@ async def scrape_with_playwright(shortcode: str) -> Dict:
         return create_fallback(shortcode)
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context(
-            viewport={"width": 1920, "height": 1080},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+        # Define a persistent directory path to store cookies, session states, and local storage
+        session_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "instagram_session")
+        
+        # Launch using a persistent context to make transactions look continuous
+        context = await p.chromium.launch_persistent_context(
+            user_data_dir=session_dir,
+            headless=True,
+            viewport={"width": 1366, "height": 768},  # Using a standard desktop resolution
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            locale="en-US",
+            timezone_id="America/New_York"
         )
         
         page = await context.new_page()
@@ -37,19 +45,35 @@ async def scrape_with_playwright(shortcode: str) -> Dict:
 
         try:
             url = f"https://www.instagram.com/p/{shortcode}/"
+            
+            # Add a random initial delay before hitting the page (1 to 3 seconds)
+            await asyncio.sleep(random.uniform(1.0, 3.0))
+            
             await page.goto(url, wait_until="networkidle", timeout=30000)
             
-            # Wait for content to load
-            await page.wait_for_timeout(5000)
+            # Emulate natural human pacing with randomized delays (3 to 6 seconds)
+            await page.wait_for_timeout(random.randint(3000, 6000))
             
-            # Try to extract data
+            # Simulate a subtle mouse scroll to mimic user interaction and trigger lazy loading safely
+            await page.evaluate("window.scrollTo({top: random = Math.floor(Math.random() * 200) + 100, behavior: 'smooth'});")
+            await page.wait_for_timeout(random.randint(1500, 3000))
+
+            # Extraction logic targeting common Instagram caption elements
             caption = await page.evaluate('''() => {
                 const el = document.querySelector('span[data-testid="post-comment-text"]') || 
-                          document.querySelector('div[data-testid="post-comment-text"]');
+                          document.querySelector('div[data-testid="post-comment-text"]') ||
+                          document.querySelector('h1._ap3a'); // Fallback selector for updated DOM
                 return el ? el.innerText : "No caption available.";
             }''')
 
-            # Get basic stats (often hidden, but we try)
+            # Fallback checking if we were redirected to a login page or challenge page
+            if "login" in page.url or caption == "No caption available.":
+                print(f"⚠️ Instagram redirected to authentication or hidden content on post: {shortcode}")
+                # Try parsing plain text body directly as a secondary fallback strategy
+                body_text = await page.inner_text("body")
+                if "Login" in body_text and "Sign Up" in body_text:
+                    raise Exception("Encountered Instagram Login Wall.")
+
             likes = 0
             comments = 0
             views = 0
@@ -72,12 +96,12 @@ async def scrape_with_playwright(shortcode: str) -> Dict:
             }
             
             print(f"✅ Playwright successfully scraped post {shortcode}")
-            await browser.close()
+            await context.close()
             return data
 
         except Exception as e:
             print(f"❌ Playwright error for {shortcode}: {e}")
-            await browser.close()
+            await context.close()
             return create_fallback(shortcode)
 
 
@@ -103,7 +127,6 @@ def create_fallback(shortcode: str) -> Dict:
 def get_instagram_post(shortcode: str) -> Dict:
     """Main function - tries Playwright first"""
     try:
-        # Run async function
         import asyncio
         return asyncio.run(scrape_with_playwright(shortcode))
     except Exception as e:
@@ -116,9 +139,7 @@ def get_instagram_posts_by_shortcodes(shortcodes: List[str]) -> List[Dict]:
     return [get_instagram_post(code.strip()) for code in shortcodes if code.strip()]
 
 
-# Keep profile function simple
 def get_instagram_profile_posts(username: str, max_posts: int = 12) -> List[Dict]:
-    # Fallback to old method for profiles
     import instaloader
     L = instaloader.Instaloader()
     posts = []
@@ -148,7 +169,7 @@ def get_instagram_profile_posts(username: str, max_posts: int = 12) -> List[Dict
             }
             posts.append(data)
             count += 1
-            time.sleep(1)
+            time.sleep(random.uniform(1.5, 3.5))  # Added randomized pause between Instaloader calls
     except Exception as e:
         print(f"Profile scraping error: {e}")
     return posts or [{"post_id": "demo", "platform": "Instagram", "creator": username, "title": "Demo Post", "transcript": "Demo content"}]
