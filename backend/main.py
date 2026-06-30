@@ -1,16 +1,23 @@
+import os
+from pathlib import Path
+from typing import List, Dict
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Dict
-from rag_engine import analyze_profile, analyze_posts, vector_store, llm
-import uvicorn
 from dotenv import load_dotenv
-import os
+
+# Crucial fix for nested async loops in FastAPI/Uvicorn environments
+import nest_asyncio
+nest_asyncio.apply()
 
 # LangChain imports
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
+
+# Project imports
+from rag_engine import analyze_profile, analyze_posts, vector_store, llm
 
 load_dotenv()
 
