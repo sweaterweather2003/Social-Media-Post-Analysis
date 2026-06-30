@@ -6,18 +6,22 @@ from typing import List
 from dotenv import load_dotenv
 
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from extractors import get_instagram_posts_by_shortcodes
+# Import extractors
+from extractors import get_instagram_profile_posts, get_instagram_posts_by_shortcodes
 
 load_dotenv()
+
 backend_dir = Path(__file__).resolve().parent
 
 if not os.getenv("GOOGLE_API_KEY"):
     raise ValueError("CRITICAL ERROR: GOOGLE_API_KEY is missing from your .env file!")
 
+# Models
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.4)
 embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-2-preview")
 
@@ -26,24 +30,25 @@ vector_store = Chroma(
     persist_directory=str(backend_dir / "chroma_db_gemini")
 )
 
-def analyze_posts(shortcodes: List[str], focus: str = "engagement comparison, best performing, improvement suggestions", post_type: str = "reels"):
+def analyze_posts(shortcodes: List[str], focus: str = "engagement comparison, best performing, improvement suggestions"):
     print(f"🔍 Analyzing {len(shortcodes)} Instagram posts")
-
+    
     try:
         posts = get_instagram_posts_by_shortcodes(shortcodes)
+        print(f"✅ Fetched {len(posts)} posts")
     except Exception as e:
         print(f"⚠️ Failed to fetch posts: {e}")
         posts = []
 
+    # Build detailed post data with full captions
     posts_details = []
     for i, p in enumerate(posts):
         full_caption = p.get('transcript', 'No caption available.')
-        post_label = "Reel" if p.get('post_type') == 'reel' else "Post"
-        
         posts_details.append(f"""
-{post_label} {i+1}:
+Post {i+1}:
 Title: {p.get('title', 'No title')}
-Views: {p.get('views', 0)} | Likes: {p.get('likes', 0)} | Comments: {p.get('comments', 0)} | Engagement: {p.get('engagement_rate', 0)}%
+Views: {p.get('views', 0)} | Likes: {p.get('likes', 0)} | 
+Comments: {p.get('comments', 0)} | Engagement: {p.get('engagement_rate', 0)}%
 
 FULL VERBATIM CAPTION:
 {full_caption}
@@ -54,24 +59,25 @@ FULL VERBATIM CAPTION:
     prompt = f"""
 You are a professional social media growth strategist.
 
-Here is the data for the Instagram content provided:
+Here is the complete data for the Instagram Reels the user asked about:
 
 {posts_summary}
 
-Respond using this exact format:
+Respond in this exact structure:
 
 **1. Full Captions (Verbatim)**
 
-Show the complete caption for each post exactly as it appears above.
+[Show the complete original caption for each post here. Do not summarize or shorten it. Show it exactly as it appears.]
 
 **2. Analysis & Strategic Insights**
 
+Then provide your professional analysis:
 - Overall Performance Summary
 - What Worked Well
 - Areas for Improvement
 - Actionable Recommendations
 
-Be honest about data limitations.
+Write naturally and professionally.
 """
 
     response = llm.invoke(prompt)
@@ -81,7 +87,7 @@ Be honest about data limitations.
         page_content=result,
         metadata={"type": "posts_analysis", "timestamp": datetime.now().isoformat()}
     )
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
     chunks = splitter.split_documents([doc])
     vector_store.add_documents(chunks)
     
@@ -93,9 +99,18 @@ def analyze_profile(profile_handle: str, focus: str = "growth, best posts, trend
     
     try:
         posts = get_instagram_profile_posts(profile_handle, max_posts=12)
+        print(f"✅ Fetched {len(posts)} posts from Instagram")
     except Exception as e:
         print(f"⚠️ Failed to fetch posts: {e}")
         posts = []
+
+    search = DuckDuckGoSearchRun()
+    search_query = f"{profile_handle} instagram reels best performing content OR trends 2026"
+    try:
+        search_results = search.run(search_query)
+    except Exception as e:
+        print(f"⚠️ Search failed: {e}")
+        search_results = "No additional search results available."
 
     posts_summary = "\n".join([
         f"- {p.get('title', 'Untitled')} | Views: {p.get('views', 0)} | Likes: {p.get('likes', 0)} | "
@@ -104,7 +119,7 @@ def analyze_profile(profile_handle: str, focus: str = "growth, best posts, trend
     ]) if posts else "No posts were fetched."
 
     prompt = f"""
-You are a top social media growth strategist in 2026.
+You are a top social media growth strategist in 2026. Speak naturally and conversationally.
 
 Profile: @{profile_handle}
 Focus: {focus}
@@ -112,7 +127,10 @@ Focus: {focus}
 Recent Posts Data:
 {posts_summary}
 
-Provide a clear, natural, and actionable response.
+Additional Web Context:
+{search_results}
+
+Provide a clear, structured, and actionable response.
 """
 
     response = llm.invoke(prompt)
