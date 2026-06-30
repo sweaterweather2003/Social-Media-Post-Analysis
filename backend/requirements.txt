@@ -11,3 +11,7 @@ duckduckgo-search
 chromadb
 ddgs
 instaloader
+playwright
+playwright-stealth
+asyncio
+nest-asyncio
