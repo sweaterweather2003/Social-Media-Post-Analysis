@@ -7,11 +7,4 @@ langchain-community
 langgraph
 langchain-google-genai
 langchain-chroma
-duckduckgo-search
-chromadb
-ddgs
-instaloader
-playwright
-playwright-stealth
-nest-asyncio
 apify-client>=1.0.0
