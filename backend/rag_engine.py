@@ -10,7 +10,8 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from extractors import get_instagram_posts_by_shortcodes
+# Import from extractors
+from extractors import get_instagram_posts_by_shortcodes, get_instagram_profile_posts
 
 load_dotenv()
 backend_dir = Path(__file__).resolve().parent
@@ -26,7 +27,7 @@ vector_store = Chroma(
     persist_directory=str(backend_dir / "chroma_db_gemini")
 )
 
-def analyze_posts(shortcodes: List[str], focus: str = "engagement comparison, best performing, improvement suggestions", post_type: str = "reels"):
+def analyze_posts(shortcodes: List[str], focus: str = "engagement comparison, best performing, improvement suggestions"):
     print(f"🔍 Analyzing {len(shortcodes)} Instagram posts")
 
     try:
@@ -34,6 +35,9 @@ def analyze_posts(shortcodes: List[str], focus: str = "engagement comparison, be
     except Exception as e:
         print(f"⚠️ Failed to fetch posts: {e}")
         posts = []
+
+    if not posts:
+        return "Could not fetch any Instagram post data. Please make sure the posts are public and try again."
 
     posts_details = []
     for i, p in enumerate(posts):
@@ -71,7 +75,7 @@ Show the complete original caption for each post exactly as provided above.
 - Areas for Improvement
 - Actionable Recommendations
 
-Be honest if data is limited.
+Be honest if data is limited. Focus on engagement, content quality, and growth opportunities.
 """
 
     response = llm.invoke(prompt)
