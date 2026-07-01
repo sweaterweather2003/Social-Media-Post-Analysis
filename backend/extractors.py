@@ -21,11 +21,12 @@ def calculate_engagement(likes: int, comments: int, views: int = 0) -> float:
 
 
 def scrape_posts(direct_urls: List[str]) -> List[Dict]:
+    """Core Apify scraping function"""
     if not APIFY_TOKEN:
-        print("❌ APIFY_TOKEN missing!")
+        print("❌ APIFY_TOKEN is missing!")
         return []
 
-    print(f"🔄 Scraping {len(direct_urls)} posts via Apify...")
+    print(f"🔄 Scraping {len(direct_urls)} items via Apify...")
 
     try:
         url = f"{BASE_URL}/acts/apify/instagram-scraper/runs?token={APIFY_TOKEN}"
@@ -36,18 +37,22 @@ def scrape_posts(direct_urls: List[str]) -> List[Dict]:
         resp = requests.post(url, json=payload)
         resp.raise_for_status()
         run_id = resp.json()["data"]["id"]
+        print(f"🚀 Apify run started: {run_id}")
 
-        # Wait for run
+        # Wait for completion
         status_url = f"{BASE_URL}/actor-runs/{run_id}?token={APIFY_TOKEN}"
-        for _ in range(36):
+        for _ in range(36):  # ~3 minutes max
             time.sleep(5)
-            status = requests.get(status_url).json()["data"]["status"]
+            status_resp = requests.get(status_url)
+            status_resp.raise_for_status()
+            status = status_resp.json()["data"]["status"]
             if status == "SUCCEEDED":
+                print("✅ Apify run completed")
                 break
             if status in ["FAILED", "ABORTED"]:
                 raise Exception(f"Run failed: {status}")
 
-        # Get results
+        # Fetch results
         dataset_url = f"{BASE_URL}/actor-runs/{run_id}/dataset/items?token={APIFY_TOKEN}"
         raw_results = requests.get(dataset_url).json()
 
@@ -74,19 +79,20 @@ def scrape_posts(direct_urls: List[str]) -> List[Dict]:
                 "hashtags": [f"#{h}" for h in post.get("hashtags", [])],
                 "upload_date": (post.get("timestamp") or "").split("T")[0],
                 "duration": int(post.get("videoDuration") or 0),
-                "post_type": "reel" if post.get("isVideo") else "post"
+                "post_type": "reel" if post.get("isVideo", False) else "post"
             }
             processed.append(data)
 
+        print(f"✅ Successfully fetched {len(processed)} posts")
         return processed
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Apify error: {e}")
         return []
 
 
 def get_instagram_posts_by_shortcodes(shortcodes: List[str]) -> List[Dict]:
-    """This function is called from your frontend"""
+    """Used by analyze_posts"""
     direct_urls = []
     for item in shortcodes:
         item = item.strip()
@@ -95,3 +101,15 @@ def get_instagram_posts_by_shortcodes(shortcodes: List[str]) -> List[Dict]:
         else:
             direct_urls.append(f"https://www.instagram.com/p/{item}/")
     return scrape_posts(direct_urls)
+
+
+def get_instagram_profile_posts(username: str, max_posts: int = 12) -> List[Dict]:
+    """Used by analyze_profile"""
+    try:
+        direct_urls = [f"https://www.instagram.com/{username}/"]
+        return scrape_posts(direct_urls)[:max_posts]
+    except:
+        return [{"post_id": "demo", "platform": "Instagram", "creator": username, "title": "Demo Post", "transcript": "Profile fetch failed"}]
+
+
+__all__ = ["get_instagram_posts_by_shortcodes", "get_instagram_profile_posts", "calculate_engagement"]
