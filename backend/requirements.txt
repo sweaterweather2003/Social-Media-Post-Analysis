@@ -11,4 +11,4 @@ duckduckgo-search
 chromadb
 ddgs
 instaloader
-apify-client
+apify-client>=1.0.0
