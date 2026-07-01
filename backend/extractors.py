@@ -10,6 +10,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Apify Client
+try:
+    from apify_client import ApifyClient
+    client = ApifyClient(os.getenv("APIFY_TOKEN"))
+    APIFY_AVAILABLE = True
+except ImportError:
+    print("⚠️ Apify client not installed. Install with: pip install apify-client")
+    APIFY_AVAILABLE = False
+    client = None
+
+
 def calculate_engagement(likes: int, comments: int, views: int = 0) -> float:
     total = likes + comments
     if views > 0:
@@ -17,8 +28,55 @@ def calculate_engagement(likes: int, comments: int, views: int = 0) -> float:
     return round((total / max(total, 1)) * 100, 2) if total > 0 else 0.0
 
 
+def apify_get_post(shortcode: str) -> Dict:
+    """Primary scraper using Apify Instagram Post Scraper"""
+    if not APIFY_AVAILABLE or not client:
+        return None
+
+    try:
+        run_input = {
+            "postUrls": [f"https://www.instagram.com/p/{shortcode}/"],
+            "resultsLimit": 1,
+            "includeComments": False,  # Set True if you need comments
+        }
+
+        run = client.actor("apify/instagram-post-scraper").call(run_input=run_input)
+        
+        dataset = client.dataset(run["defaultDatasetId"])
+        items = dataset.list_items().items
+
+        if not items:
+            return None
+
+        post = items[0]
+
+        return {
+            "post_id": shortcode,
+            "platform": "Instagram",
+            "creator": post.get("ownerUsername", "Unknown"),
+            "title": (post.get("caption") or "").split('\n')[0][:100] if post.get("caption") else "Instagram Post",
+            "views": post.get("videoViewCount") or post.get("viewsCount") or 0,
+            "likes": post.get("likesCount") or 0,
+            "comments": post.get("commentsCount") or 0,
+            "engagement_rate": calculate_engagement(
+                post.get("likesCount", 0),
+                post.get("commentsCount", 0),
+                post.get("videoViewCount") or post.get("viewsCount") or 0
+            ),
+            "transcript": post.get("caption") or "No caption available.",
+            "url": f"https://www.instagram.com/p/{shortcode}/",
+            "hashtags": [f"#{tag}" for tag in post.get("hashtags", [])],
+            "upload_date": post.get("timestamp", "").split("T")[0] if post.get("timestamp") else datetime.datetime.now().strftime("%Y-%m-%d"),
+            "duration": int(post.get("videoDuration") or 0),
+            "post_type": "reel" if post.get("isVideo", False) or post.get("videoUrl") else "post"
+        }
+    except Exception as e:
+        print(f"❌ Apify error for {shortcode}: {e}")
+        return None
+
+
 async def scrape_with_playwright(shortcode: str) -> Dict:
-    """Advanced scraping using Playwright + Persistent Context + Behavioral Emulation"""
+    """Fallback scraper (your original code)"""
     try:
         from playwright.async_api import async_playwright
         from playwright_stealth import stealth_async
@@ -27,14 +85,12 @@ async def scrape_with_playwright(shortcode: str) -> Dict:
         return create_fallback(shortcode)
 
     async with async_playwright() as p:
-        # Define a persistent directory path to store cookies, session states, and local storage
         session_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "instagram_session")
         
-        # Launch using a persistent context to make transactions look continuous
         context = await p.chromium.launch_persistent_context(
             user_data_dir=session_dir,
             headless=True,
-            viewport={"width": 1366, "height": 768},  # Using a standard desktop resolution
+            viewport={"width": 1366, "height": 768},
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             locale="en-US",
             timezone_id="America/New_York"
@@ -45,48 +101,34 @@ async def scrape_with_playwright(shortcode: str) -> Dict:
 
         try:
             url = f"https://www.instagram.com/p/{shortcode}/"
-            
-            # Add a random initial delay before hitting the page (1 to 3 seconds)
             await asyncio.sleep(random.uniform(1.0, 3.0))
-            
             await page.goto(url, wait_until="networkidle", timeout=30000)
-            
-            # Emulate natural human pacing with randomized delays (3 to 6 seconds)
             await page.wait_for_timeout(random.randint(3000, 6000))
             
-            # Simulate a subtle mouse scroll to mimic user interaction and trigger lazy loading safely
             await page.evaluate("window.scrollTo({top: random = Math.floor(Math.random() * 200) + 100, behavior: 'smooth'});")
             await page.wait_for_timeout(random.randint(1500, 3000))
 
-            # Extraction logic targeting common Instagram caption elements
             caption = await page.evaluate('''() => {
                 const el = document.querySelector('span[data-testid="post-comment-text"]') || 
                           document.querySelector('div[data-testid="post-comment-text"]') ||
-                          document.querySelector('h1._ap3a'); // Fallback selector for updated DOM
+                          document.querySelector('h1._ap3a');
                 return el ? el.innerText : "No caption available.";
             }''')
 
-            # Fallback checking if we were redirected to a login page or challenge page
             if "login" in page.url or caption == "No caption available.":
-                print(f"⚠️ Instagram redirected to authentication or hidden content on post: {shortcode}")
-                # Try parsing plain text body directly as a secondary fallback strategy
                 body_text = await page.inner_text("body")
                 if "Login" in body_text and "Sign Up" in body_text:
                     raise Exception("Encountered Instagram Login Wall.")
-
-            likes = 0
-            comments = 0
-            views = 0
 
             data = {
                 "post_id": shortcode,
                 "platform": "Instagram",
                 "creator": "Unknown",
                 "title": caption.split('\n')[0][:100] if caption else "Instagram Post",
-                "views": views,
-                "likes": likes,
-                "comments": comments,
-                "engagement_rate": calculate_engagement(likes, comments, views),
+                "views": 0,
+                "likes": 0,
+                "comments": 0,
+                "engagement_rate": 0.0,
                 "transcript": caption,
                 "url": f"https://www.instagram.com/p/{shortcode}/",
                 "hashtags": [],
@@ -95,7 +137,7 @@ async def scrape_with_playwright(shortcode: str) -> Dict:
                 "post_type": "post"
             }
             
-            print(f"✅ Playwright successfully scraped post {shortcode}")
+            print(f"✅ Playwright fallback succeeded for {shortcode}")
             await context.close()
             return data
 
@@ -115,7 +157,7 @@ def create_fallback(shortcode: str) -> Dict:
         "likes": 0,
         "comments": 0,
         "engagement_rate": 0.0,
-        "transcript": f"Could not fetch data for this post.\n\nInstagram is actively blocking automated tools.\n\nTry these:\n1. Make sure the post is public\n2. Try again later\n3. Use manual input mode (coming soon)",
+        "transcript": f"Could not fetch data for this post.\n\nTry these:\n1. Make sure the post is public\n2. Try again later",
         "url": f"https://www.instagram.com/p/{shortcode}/",
         "hashtags": [],
         "upload_date": datetime.datetime.now().strftime("%Y-%m-%d"),
@@ -125,7 +167,15 @@ def create_fallback(shortcode: str) -> Dict:
 
 
 def get_instagram_post(shortcode: str) -> Dict:
-    """Main function - tries Playwright first"""
+    """Main function - tries Apify first, then Playwright fallback"""
+    # Try Apify first
+    if APIFY_AVAILABLE:
+        data = apify_get_post(shortcode)
+        if data:
+            print(f"✅ Apify successfully scraped post {shortcode}")
+            return data
+
+    # Fallback to Playwright
     try:
         import asyncio
         return asyncio.run(scrape_with_playwright(shortcode))
@@ -135,11 +185,12 @@ def get_instagram_post(shortcode: str) -> Dict:
 
 
 def get_instagram_posts_by_shortcodes(shortcodes: List[str]) -> List[Dict]:
-    print(f"Fetching {len(shortcodes)} Instagram posts using Playwright...")
+    print(f"Fetching {len(shortcodes)} Instagram posts using Apify + fallback...")
     return [get_instagram_post(code.strip()) for code in shortcodes if code.strip()]
 
 
 def get_instagram_profile_posts(username: str, max_posts: int = 12) -> List[Dict]:
+    """Profile scraper - still using Instaloader for now (can be upgraded to Apify later)"""
     import instaloader
     L = instaloader.Instaloader()
     posts = []
@@ -169,7 +220,7 @@ def get_instagram_profile_posts(username: str, max_posts: int = 12) -> List[Dict
             }
             posts.append(data)
             count += 1
-            time.sleep(random.uniform(1.5, 3.5))  # Added randomized pause between Instaloader calls
+            time.sleep(random.uniform(1.5, 3.5))
     except Exception as e:
         print(f"Profile scraping error: {e}")
     return posts or [{"post_id": "demo", "platform": "Instagram", "creator": username, "title": "Demo Post", "transcript": "Demo content"}]
