@@ -5,11 +5,6 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from dotenv import load_dotenv
-
-# Crucial fix for nested async loops in FastAPI/Uvicorn environments
-import nest_asyncio
-nest_asyncio.apply()
 
 # LangChain imports
 from langchain_core.prompts import ChatPromptTemplate
@@ -19,6 +14,8 @@ from langchain_core.output_parsers import StrOutputParser
 # Project imports
 from rag_engine import analyze_profile, analyze_posts, vector_store, llm
 
+# Load environment variables
+from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI(title="Social Growth OS")
