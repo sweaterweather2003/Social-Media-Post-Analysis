@@ -5,132 +5,111 @@ from typing import List
 
 from dotenv import load_dotenv
 
+# LangChain imports
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# Import from extractors
-from extractors import get_instagram_posts_by_shortcodes, get_instagram_profile_posts
-
 load_dotenv()
+
 backend_dir = Path(__file__).resolve().parent
 
+# Check for Google API Key
 if not os.getenv("GOOGLE_API_KEY"):
-    raise ValueError("CRITICAL ERROR: GOOGLE_API_KEY is missing from your .env file!")
+    print("⚠️  GOOGLE_API_KEY is missing from .env file! Chat features will be limited.")
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.4)
-embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-2-preview")
-
-vector_store = Chroma(
-    embedding_function=embeddings, 
-    persist_directory=str(backend_dir / "chroma_db_gemini")
+# Initialize LLM and Embeddings
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    temperature=0.4,
+    convert_system_message_to_human=True
 )
 
-def analyze_posts(shortcodes: List[str], focus: str = "engagement comparison, best performing, improvement suggestions"):
-    print(f"🔍 Analyzing {len(shortcodes)} Instagram posts")
+embeddings = GoogleGenerativeAIEmbeddings(model="embedding-001")
 
-    try:
-        posts = get_instagram_posts_by_shortcodes(shortcodes)
-    except Exception as e:
-        print(f"⚠️ Failed to fetch posts: {e}")
-        posts = []
+# Vector Store
+vector_store = Chroma(
+    embedding_function=embeddings,
+    persist_directory=str(backend_dir / "chroma_db")
+)
+
+def analyze_posts(shortcodes_or_urls: List[str], focus: str = "engagement comparison, best performing, improvement suggestions"):
+    """This function is called from main.py after scraping"""
+    print(f"🔍 Generating AI insights for {len(shortcodes_or_urls)} posts...")
+
+    # Load data from database
+    from db import get_all_posts
+    posts = get_all_posts()
 
     if not posts:
-        return "Could not fetch any Instagram post data. Please make sure the posts are public and try again."
+        return "No posts found in database."
 
     posts_details = []
     for i, p in enumerate(posts):
-        full_caption = p.get('transcript', 'No caption available.')
-        post_label = "Reel" if p.get('post_type') == 'reel' else "Post"
-        
         posts_details.append(f"""
-{post_label} {i+1}:
-Title: {p.get('title', 'No title')}
-Views: {p.get('views', 0)} | Likes: {p.get('likes', 0)} | Comments: {p.get('comments', 0)} | Engagement: {p.get('engagement_rate', 0)}%
-
-FULL VERBATIM CAPTION:
-{full_caption}
+Post {i+1}:
+URL: {p.get('post_url')}
+Shortcode: {p.get('shortcode')}
+Likes: {p.get('likes_count')} | Comments: {p.get('comments_count')}
+Caption: {p.get('caption', 'No caption')[:500]}...
 """)
 
     posts_summary = "\n".join(posts_details)
 
     prompt = f"""
-You are a professional social media growth strategist.
+You are a professional Instagram growth strategist in 2026.
 
-Here is the available data for the Instagram content:
+Here is the data from the analyzed posts:
 
 {posts_summary}
 
-Respond using this exact format:
+Focus: {focus}
 
-**1. Full Captions (Verbatim)**
+Respond in this exact format:
 
-Show the complete original caption for each post exactly as provided above.
+**1. Performance Summary**
+- Overall engagement level
+- Best performing post and why
+- Key insights
 
-**2. Analysis & Strategic Insights**
+**2. What Worked Well**
+- List 3-4 strengths
 
-- Overall Performance Summary
-- What Worked Well
-- Areas for Improvement
-- Actionable Recommendations
+**3. Areas for Improvement**
+- List 3-4 weaknesses
 
-Be honest if data is limited. Focus on engagement, content quality, and growth opportunities.
+**4. Actionable Recommendations**
+- Give 5 specific, practical tips for next posts
+
+Be honest and data-driven.
 """
 
-    response = llm.invoke(prompt)
-    result = response.content if hasattr(response, 'content') else str(response)
-    
+    try:
+        response = llm.invoke(prompt)
+        result = response.content if hasattr(response, 'content') else str(response)
+    except Exception as e:
+        result = f"AI Analysis unavailable: {str(e)}\n\nPlease check your GOOGLE_API_KEY."
+
+    # Save to vector store for chat memory
     doc = Document(
         page_content=result,
-        metadata={"type": "posts_analysis", "timestamp": datetime.now().isoformat()}
+        metadata={
+            "type": "posts_analysis",
+            "timestamp": datetime.now().isoformat()
+        }
     )
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
     chunks = splitter.split_documents([doc])
     vector_store.add_documents(chunks)
-    
+
     return result
 
 
-def analyze_profile(profile_handle: str, focus: str = "growth, best posts, trends, suggestions"):
-    print(f"🔍 Analyzing profile: {profile_handle}")
-    
-    try:
-        posts = get_instagram_profile_posts(profile_handle, max_posts=12)
-    except Exception as e:
-        print(f"⚠️ Failed to fetch posts: {e}")
-        posts = []
-
-    posts_summary = "\n".join([
-        f"- {p.get('title', 'Untitled')} | Views: {p.get('views', 0)} | Likes: {p.get('likes', 0)} | "
-        f"Comments: {p.get('comments', 0)} | Engagement: {p.get('engagement_rate', 0)}% | Date: {p.get('upload_date')}"
-        for p in posts[:10]
-    ]) if posts else "No posts were fetched."
-
-    prompt = f"""
-You are a top social media growth strategist in 2026.
-
-Profile: @{profile_handle}
-Focus: {focus}
-
-Recent Posts Data:
-{posts_summary}
-
-Provide a clear, natural, and actionable response.
-"""
-
-    response = llm.invoke(prompt)
-    result = response.content if hasattr(response, 'content') else str(response)
-    
-    doc = Document(
-        page_content=result,
-        metadata={"profile": profile_handle, "type": "profile_analysis", "timestamp": datetime.now().isoformat()}
-    )
-    splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
-    chunks = splitter.split_documents([doc])
-    vector_store.add_documents(chunks)
-    
-    return result
+def get_chat_context():
+    """Helper for chat endpoint"""
+    retriever = vector_store.as_retriever(search_kwargs={"k": 4})
+    return retriever
 
 
-__all__ = ["analyze_profile", "analyze_posts", "vector_store", "llm"]
+__all__ = ["analyze_posts", "get_chat_context", "llm", "vector_store"]
