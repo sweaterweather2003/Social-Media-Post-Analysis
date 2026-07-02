@@ -1,10 +1,8 @@
 fastapi
 uvicorn[standard]
 python-dotenv
-pydantic
-langchain
-langchain-community
-langgraph
-langchain-google-genai
-langchain-chroma
-requests
+requests==2.31.0
+pandas
+matplotlib
+python-dotenv==1.0.0
+nest-asyncio
