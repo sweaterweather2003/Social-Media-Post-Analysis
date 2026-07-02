@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-# Crucial for async in FastAPI
+# Fix for nested async loops
 import nest_asyncio
 nest_asyncio.apply()
 
@@ -84,7 +84,7 @@ async def analyze_posts_endpoint(payload: PostsPayload):
             "success": True,
             "analysis": ai_analysis,
             "summary": summary,
-            "raw_posts": results[:8]  # Limit for response size
+            "raw_posts": results[:8]
         }
     except Exception as e:
         print(f"Error in analyze_posts: {e}")
