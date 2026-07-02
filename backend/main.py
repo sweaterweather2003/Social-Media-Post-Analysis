@@ -1,18 +1,28 @@
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Dict
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
+# Crucial for async in FastAPI
+import nest_asyncio
+nest_asyncio.apply()
+
 load_dotenv()
 
 # Project imports
-from db import init_db
+from db import init_db, insert_post
 from scraper import scrape_posts
 from analysis import run_full_analysis, load_dataframe
+from rag_engine import analyze_posts, get_chat_context
+
+# LangChain imports for chat
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
 
 app = FastAPI(title="Instagram Growth OS")
 
@@ -28,15 +38,21 @@ class PostsPayload(BaseModel):
     post_urls: List[str]
     focus: str = "engagement comparison, best performing, improvement suggestions"
 
+class ChatPayload(BaseModel):
+    question: str
+    chat_history: List[Dict[str, str]] = []
+
 @app.post("/api/analyze-posts")
-async def analyze_posts(payload: PostsPayload):
+async def analyze_posts_endpoint(payload: PostsPayload):
     try:
         print(f"🔍 Analyzing {len(payload.post_urls)} Instagram posts via Apify...")
 
         init_db()
+        
+        # Scrape using Apify
         results = scrape_posts(payload.post_urls, results_limit=50)
 
-        print(f"Fetched {len(results)} items. Storing in database...")
+        print(f"Fetched {len(results)} item(s). Storing in database...")
         for item in results:
             post_data = {
                 "post_url": item.get("url"),
@@ -47,11 +63,9 @@ async def analyze_posts(payload: PostsPayload):
                 "comments_count": item.get("commentsCount", 0),
                 "timestamp": item.get("timestamp"),
             }
-            # Reuse your existing insert_post
-            from db import insert_post
             insert_post(post_data)
 
-        print("Running analysis...")
+        print("Running statistical analysis and generating charts...")
         run_full_analysis()
 
         df = load_dataframe()
@@ -63,14 +77,51 @@ async def analyze_posts(payload: PostsPayload):
             "charts": ["engagement_trend.png", "top_posts.png"]
         }
 
+        # Generate AI insights
+        ai_analysis = analyze_posts(payload.post_urls)
+
         return {
             "success": True,
-            "analysis": f"Analyzed {len(results)} posts successfully.",
+            "analysis": ai_analysis,
             "summary": summary,
-            "raw_posts": results[:10]  # limit for frontend
+            "raw_posts": results[:8]  # Limit for response size
         }
     except Exception as e:
+        print(f"Error in analyze_posts: {e}")
         return {"success": False, "error": str(e)}
+
+@app.post("/api/chat")
+async def chat_endpoint(payload: ChatPayload):
+    try:
+        question = payload.question
+        retriever = get_chat_context()
+        
+        template = """You are an expert Instagram growth strategist.
+        Use the following previous analyses and context to answer the user's question.
+
+        Context:
+        {context}
+
+        Question: {question}
+
+        Important: Respond with clean, natural English paragraphs and bullet points only.
+        Do NOT output JSON, code blocks, or any technical formatting.
+        Just write like a normal helpful AI assistant."""
+
+        prompt = ChatPromptTemplate.from_template(template)
+
+        chain = (
+            {"context": retriever, "question": RunnablePassthrough()}
+            | prompt
+            | llm
+            | StrOutputParser()
+        )
+
+        response = chain.invoke(question)
+        return {"response": response}
+        
+    except Exception as e:
+        return {"response": f"Sorry, I encountered an error: {str(e)}"}
 
 @app.get("/health")
 async def health():
