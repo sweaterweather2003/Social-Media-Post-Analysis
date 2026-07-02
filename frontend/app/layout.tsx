@@ -1,10 +1,9 @@
-// /home/workdir/attachments/layout.tsx
 import React from 'react';
 import './globals.css';
 
 export const metadata = {
-  title: 'Social Growth Intelligence',
-  description: 'Instagram • x • Facebook Performance Analyst & Strategist',
+  title: 'Instagram Growth OS',
+  description: 'Apify + AI Powered Instagram Engagement Analyzer',
 };
 
 export default function RootLayout({
@@ -13,10 +12,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="bg-black">
-      <body className="antialiased m-0 p-0">
-        {children}
-      </body>
+    <html lang="en">
+      <body>{children}</body>
     </html>
   );
 }
