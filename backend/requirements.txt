@@ -4,5 +4,11 @@ python-dotenv
 requests==2.31.0
 pandas
 matplotlib
-python-dotenv==1.0.0
 nest-asyncio
+langchain
+langchain-community
+langchain-google-genai
+langchain-chroma
+chromadb
+pydantic
+sqlalchemy
