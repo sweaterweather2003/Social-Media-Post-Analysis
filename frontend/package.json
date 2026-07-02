@@ -1,5 +1,5 @@
 {
-  "name": "video-rag-frontend",
+  "name": "instagram-growth-os",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,18 +9,13 @@
   },
   "dependencies": {
     "ai": "^2.2.31",
-    "axios": "^1.7.2",
     "next": "^16.2.6",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6",
-    "zod": "^3.23.8"
+    "react-dom": "^19.2.6"
   },
   "devDependencies": {
     "@types/node": "25.9.1",
     "@types/react": "19.2.15",
     "typescript": "6.0.3"
-  },
-  "engines": {
-    "node": ">=20"
   }
 }
