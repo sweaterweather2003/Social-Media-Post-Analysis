@@ -35,12 +35,7 @@ const renderCleanConsoleOutput = (text: string) => {
 };
 
 export default function Home() {
-  const [igUsername, setIgUsername] = useState("");
-  const [xUsername, setxUsername] = useState("");
-  const [fbPage, setFbPage] = useState("");
   const [postInput, setPostInput] = useState("");
-  const [mode, setMode] = useState<"accounts" | "posts">("accounts");
-  const [postType, setPostType] = useState<"reels" | "all">("reels");
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastAnalysis, setLastAnalysis] = useState<any>(null);
 
@@ -58,158 +53,50 @@ export default function Home() {
     }
   }, [messages, isLoading]);
 
-  // Dynamic Quick Insights based on context
-  const getDynamicQuickPrompts = () => {
-    if (lastAnalysis && lastAnalysis.length > 0) {
-      const platform = lastAnalysis[0].platform || "";
-      
-      if (platform.includes("Posts") || platform.includes("Reels")) {
-        return [
-          "Why did one post perform better than the other?",
-          "What should I improve in my next reels?",
-          "Suggest 5 new post ideas based on this analysis",
-          "What hashtags should I use next?",
-          "Compare these posts to trending content",
-        ];
-      } else if (platform.includes("Instagram")) {
-        return [
-          "What was my best performing post this month?",
-          "Suggest 5 content ideas for next week",
-          "How can I improve my engagement rate?",
-          "What hashtags are working right now?",
-          "Give me a 7-day growth plan",
-        ];
-      }
-    }
-
-    // Default prompts
-    return [
-      "What content performed best across platforms last 30 days?",
-      "Suggest 5 ideas for next week's posts to maximize engagement",
-      "Analyze top hashtags and trending patterns right now",
-      "Give me a full growth strategy for the next 14 days",
-      "Compare my Instagram vs x performance",
-    ];
-  };
-
-  const quickPrompts = getDynamicQuickPrompts();
-
-  const extractShortcode = (input: string): string[] => {
-    return input.split(',').map(item => {
-      const trimmed = item.trim();
-      if (!trimmed) return null;
-      const urlMatch = trimmed.match(/instagram\.com\/(?:reel|p)\/([A-Za-z0-9_-]+)/);
-      if (urlMatch && urlMatch[1]) return urlMatch[1];
-      return trimmed;
-    }).filter(Boolean) as string[];
-  };
-
-  const handleAnalyzeAccounts = async () => {
-    if (!igUsername && !xUsername && !fbPage) {
-      alert("Please enter at least one username or page name");
-      return;
-    }
-
-    setIsProcessing(true);
-    const analyses: any[] = [];
-
-    try {
-      if (igUsername) {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analyze-profile`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            profile: igUsername, 
-            focus: "growth, best performing posts, current trends, improvement suggestions" 
-          }),
-        });
-        const data = await res.json();
-        analyses.push({ platform: "Instagram", ...data });
-      }
-      if (xUsername) {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analyze-profile`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            profile: xUsername, 
-            focus: "growth, best performing posts, current trends, improvement suggestions" 
-          }),
-        });
-        const data = await res.json();
-        analyses.push({ platform: "x/X", ...data });
-      }
-      if (fbPage) {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analyze-profile`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            profile: fbPage, 
-            focus: "growth, best performing posts, current trends, improvement suggestions" 
-          }),
-        });
-        const data = await res.json();
-        analyses.push({ platform: "Facebook", ...data });
-      }
-
-      setLastAnalysis(analyses);
-      alert(`✅ Analysis completed for ${analyses.length} profile(s)!`);
-      
-      setTimeout(() => {
-        chatSectionRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 300);
-
-      if (analyses.length > 0) {
-        append({ role: "user", content: `Here is the analysis for ${igUsername || xUsername || fbPage}` });
-      }
-    } catch (error) {
-      console.error(error);
-      alert("Failed to analyze accounts. Make sure backend is running.");
-    }
-    setIsProcessing(false);
+  const extractUrls = (input: string): string[] => {
+    return input.split(',').map(item => item.trim()).filter(Boolean);
   };
 
   const handleAnalyzePosts = async () => {
     if (!postInput.trim()) {
-      alert("Please enter at least one Instagram post URL or shortcode");
+      alert("Please enter at least one Instagram post URL");
       return;
     }
 
     setIsProcessing(true);
-    const shortcodeList = extractShortcode(postInput);
+    const postUrls = extractUrls(postInput);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analyze-posts`, {
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+      
+      const res = await fetch(`${backendUrl}/api/analyze-posts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          shortcodes: shortcodeList,
-          focus: "engagement comparison, best performing, improvement suggestions",
-          post_type: postType
+          post_urls: postUrls,
         }),
       });
       
       const data = await res.json();
       
-      setLastAnalysis([{ 
-        platform: `Instagram ${postType === "reels" ? "Reels" : "Posts"}`, 
-        ...data 
-      }]);
-      
-      alert(`✅ Analyzed ${shortcodeList.length} ${postType === "reels" ? "Reels" : "Posts"}!`);
-      
-      setTimeout(() => {
-        chatSectionRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 300);
-
       if (data.success) {
+        setLastAnalysis(data);
+        alert(`✅ Successfully analyzed ${postUrls.length} post(s)!`);
+        
+        setTimeout(() => {
+          chatSectionRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 300);
+
         append({ 
           role: "user", 
-          content: `Here is the analysis for ${postType === "reels" ? "Reels" : "Posts"}: ${shortcodeList.join(", ")}` 
+          content: `Analyze these Instagram posts: ${postUrls.join(", ")}` 
         });
+      } else {
+        alert("Analysis failed: " + data.error);
       }
     } catch (error) {
       console.error(error);
-      alert("Failed to analyze posts. Make sure backend is running.");
+      alert("Failed to connect to backend. Make sure the FastAPI server is running on port 8001.");
     }
     setIsProcessing(false);
   };
@@ -232,116 +119,37 @@ export default function Home() {
 
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "24px", marginBottom: "32px", border: "2px solid #27272a", backgroundColor: "#09090b" }}>
         <div>
-          <h1 style={{ fontSize: "32px", fontWeight: 900, margin: 0 }}>SOCIAL GROWTH OS</h1>
-          <p style={{ fontSize: "12px", color: "#a1a1aa", marginTop: "4px" }}>MULTI-PLATFORM AI STRATEGIST</p>
+          <h1 style={{ fontSize: "32px", fontWeight: 900, margin: 0 }}>INSTAGRAM GROWTH OS</h1>
+          <p style={{ fontSize: "12px", color: "#a1a1aa", marginTop: "4px" }}>Apify + AI Powered Engagement Analyzer</p>
         </div>
         <div style={{ padding: "8px 16px", backgroundColor: "#18181b", border: "1px solid #27272a", fontSize: "12px" }}>
           SYSTEM ONLINE
         </div>
       </header>
 
-      {/* Analysis Mode Toggle */}
       <section style={{ border: "2px solid #27272a", padding: "24px", marginBottom: "32px", backgroundColor: "#09090b" }}>
-        <div style={{ display: "flex", gap: "12px", marginBottom: "20px", borderBottom: "1px solid #27272a", paddingBottom: "16px" }}>
-          <button
-            onClick={() => setMode("accounts")}
-            style={{
-              padding: "10px 24px",
-              background: mode === "accounts" ? "#fff" : "#18181b",
-              color: mode === "accounts" ? "#000" : "#fff",
-              border: "1px solid #27272a",
-              fontWeight: "bold",
-              borderRadius: "6px"
-            }}
-          >
-            📊 Compare Accounts
-          </button>
-          <button
-            onClick={() => setMode("posts")}
-            style={{
-              padding: "10px 24px",
-              background: mode === "posts" ? "#fff" : "#18181b",
-              color: mode === "posts" ? "#000" : "#fff",
-              border: "1px solid #27272a",
-              fontWeight: "bold",
-              borderRadius: "6px"
-            }}
-          >
-            📍 Compare Instagram Posts
-          </button>
-        </div>
-
-        <h2 style={{ fontSize: "20px", fontWeight: 900, marginBottom: "20px" }}>
-          {mode === "accounts" ? "🔍 MULTI-PLATFORM ACCOUNT ANALYSIS" : "📍 INSTAGRAM POST COMPARISON"}
-        </h2>
+        <h2 style={{ fontSize: "20px", fontWeight: 900, marginBottom: "20px" }}>📍 INSTAGRAM POST ANALYSIS</h2>
         
-        {mode === "accounts" ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
-            <div>
-              <label style={{ display: "block", fontSize: "11px", color: "#a1a1aa", marginBottom: "8px" }}>INSTAGRAM USERNAME</label>
-              <input type="text" placeholder="@yourhandle" value={igUsername} onChange={(e) => setIgUsername(e.target.value)} style={{ width: "100%", padding: "14px", background: "#000", border: "1px solid #27272a", color: "white" }} />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: "11px", color: "#a1a1aa", marginBottom: "8px" }}>x / TWITTER USERNAME</label>
-              <input type="text" placeholder="@yourhandle" value={xUsername} onChange={(e) => setxUsername(e.target.value)} style={{ width: "100%", padding: "14px", background: "#000", border: "1px solid #27272a", color: "white" }} />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: "11px", color: "#a1a1aa", marginBottom: "8px" }}>FACEBOOK PAGE NAME</label>
-              <input type="text" placeholder="YourPageName" value={fbPage} onChange={(e) => setFbPage(e.target.value)} style={{ width: "100%", padding: "14px", background: "#000", border: "1px solid #27272a", color: "white" }} />
-            </div>
-          </div>
-        ) : (
-          <div>
-            <label style={{ display: "block", fontSize: "11px", color: "#a1a1aa", marginBottom: "8px" }}>POST TYPE</label>
-            <div style={{ display: "flex", gap: "10px", marginBottom: "16px" }}>
-              <button 
-                onClick={() => setPostType("reels")} 
-                style={{ 
-                  padding: "8px 20px", 
-                  background: postType === "reels" ? "#fff" : "#18181b", 
-                  color: postType === "reels" ? "#000" : "#fff", 
-                  border: "1px solid #27272a", 
-                  borderRadius: "6px" 
-                }}
-              >
-                🎥 Reels Only
-              </button>
-              <button 
-                onClick={() => setPostType("all")} 
-                style={{ 
-                  padding: "8px 20px", 
-                  background: postType === "all" ? "#fff" : "#18181b", 
-                  color: postType === "all" ? "#000" : "#fff", 
-                  border: "1px solid #27272a", 
-                  borderRadius: "6px" 
-                }}
-              >
-                📸 All Posts
-              </button>
-            </div>
-
-            <label style={{ display: "block", fontSize: "11px", color: "#a1a1aa", marginBottom: "8px" }}>
-              INSTAGRAM POST URLS OR SHORTCODES (comma separated)
-            </label>
-            <input
-              type="text"
-              placeholder="https://www.instagram.com/reel/DZNdBTogxVy/ or DZNdBTogxVy"
-              value={postInput}
-              onChange={(e) => setPostInput(e.target.value)}
-              style={{ width: "100%", padding: "14px", background: "#000", border: "1px solid #27272a", color: "white", marginBottom: "12px" }}
-            />
-            <p style={{ fontSize: "12px", color: "#a1a1aa" }}>
-              You can paste full URLs or shortcodes.
-            </p>
-          </div>
-        )}
+        <label style={{ display: "block", fontSize: "11px", color: "#a1a1aa", marginBottom: "8px" }}>
+          INSTAGRAM POST URLS (comma separated)
+        </label>
+        <input
+          type="text"
+          placeholder="https://www.instagram.com/p/DZ7TD3tDIEd/, https://www.instagram.com/p/DZffvjhj503/"
+          value={postInput}
+          onChange={(e) => setPostInput(e.target.value)}
+          style={{ width: "100%", padding: "14px", background: "#000", border: "1px solid #27272a", color: "white", marginBottom: "12px" }}
+        />
+        <p style={{ fontSize: "12px", color: "#a1a1aa" }}>
+          Paste full Instagram post URLs. Multiple URLs supported.
+        </p>
 
         <button
-          onClick={mode === "accounts" ? handleAnalyzeAccounts : handleAnalyzePosts}
-          disabled={isProcessing || (mode === "accounts" ? (!igUsername && !xUsername && !fbPage) : !postInput.trim())}
+          onClick={handleAnalyzePosts}
+          disabled={isProcessing || !postInput.trim()}
           style={{ marginTop: "20px", padding: "14px 32px", background: "#fff", color: "#000", fontWeight: "bold", border: "none" }}
         >
-          {isProcessing ? "ANALYZING..." : mode === "accounts" ? "ANALYZE ALL ACCOUNTS" : `COMPARE ${postType === "reels" ? "REELS" : "POSTS"}`}
+          {isProcessing ? "ANALYZING WITH APIFY..." : "ANALYZE POSTS"}
         </button>
       </section>
 
@@ -351,44 +159,36 @@ export default function Home() {
             <h2 style={{ fontSize: "20px", marginBottom: "20px" }}>📈 LATEST ANALYSIS</h2>
             {lastAnalysis ? (
               <div style={{ fontSize: "13px", maxHeight: "500px", overflowY: "auto" }}>
-                {lastAnalysis.map((item: any, index: number) => (
-                  <div key={index} style={{ marginBottom: "20px", padding: "12px", border: "1px solid #27272a" }}>
-                    <strong>{item.platform}:</strong>
-                    <div style={{ marginTop: "8px", color: "#a1a1aa", whiteSpace: "pre-wrap" }}>
-                      {item.analysis ? item.analysis.substring(0, 400) + "..." : "Analysis completed"}
-                    </div>
-                  </div>
-                ))}
+                <div style={{ padding: "12px", border: "1px solid #27272a", marginBottom: "16px" }}>
+                  <strong>Summary:</strong><br />
+                  Total Posts: {lastAnalysis.summary?.total_posts}<br />
+                  Avg Likes: {lastAnalysis.summary?.avg_likes}<br />
+                  Avg Comments: {lastAnalysis.summary?.avg_comments}
+                </div>
+
+                {/* Charts */}
+                <div>
+                  <h3 style={{ marginBottom: "12px" }}>📊 Generated Charts</h3>
+                  <img 
+                    src="http://localhost:8001/engagement_trend.png" 
+                    alt="Engagement Trend" 
+                    style={{ width: "100%", border: "1px solid #27272a", marginBottom: "12px" }}
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                  <img 
+                    src="http://localhost:8001/top_posts.png" 
+                    alt="Top Posts" 
+                    style={{ width: "100%", border: "1px solid #27272a" }}
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                </div>
               </div>
             ) : (
               <div style={{ color: "#52525b", padding: "60px 0", textAlign: "center" }}>
-                Select mode and enter data above
+                Enter post URLs above to begin analysis
               </div>
             )}
           </section>
-
-          {/* Dynamic Quick Insights */}
-          <div style={{ border: "2px solid #27272a", padding: "20px", backgroundColor: "#09090b" }}>
-            <h3 style={{ marginBottom: "12px", fontSize: "14px" }}>QUICK INSIGHTS</h3>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-              {quickPrompts.map((prompt, i) => (
-                <button
-                  key={i}
-                  onClick={() => append({ role: "user", content: prompt })}
-                  style={{ 
-                    padding: "10px 16px", 
-                    background: "#18181b", 
-                    border: "1px solid #27272a", 
-                    fontSize: "13px", 
-                    cursor: "pointer",
-                    color: "#ffffff"
-                  }}
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         <section ref={chatSectionRef} style={{ border: "2px solid #27272a", backgroundColor: "#09090b", height: "720px", display: "flex", flexDirection: "column" }}>
@@ -401,7 +201,7 @@ export default function Home() {
               <div style={{ padding: "20px", border: "1px solid #27272a" }}>
                 <p style={{ color: "#a1a1aa" }}>
                   Hello! I'm your AI Social Growth Strategist.<br />
-                  Analyze your accounts or posts first, then ask me anything.
+                  Analyze posts first, then ask me anything.
                 </p>
               </div>
             )}
@@ -438,7 +238,7 @@ export default function Home() {
               type="text"
               value={input}
               onChange={handleInputChange}
-              placeholder="Ask anything about performance, trends, or strategy..."
+              placeholder="Why did one post perform better? What should I post next?"
               style={{ flex: 1, padding: "12px", background: "#000", border: "1px solid #27272a", color: "white" }}
             />
             <button type="submit" style={{ padding: "0 24px", background: "#fff", color: "#000", fontWeight: "bold" }}>
