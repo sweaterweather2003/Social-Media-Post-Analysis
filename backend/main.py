@@ -1,24 +1,20 @@
 import os
 from pathlib import Path
-from typing import List, Dict
+from typing import List
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
-# LangChain imports
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough
-from langchain_core.output_parsers import StrOutputParser
-
-# Project imports
-from rag_engine import analyze_profile, analyze_posts, vector_store, llm
-
-# Load environment variables
 from dotenv import load_dotenv
+
 load_dotenv()
 
-app = FastAPI(title="Social Growth OS")
+# Project imports
+from db import init_db
+from scraper import scrape_posts
+from analysis import run_full_analysis, load_dataframe
+
+app = FastAPI(title="Instagram Growth OS")
 
 app.add_middleware(
     CORSMiddleware,
@@ -28,65 +24,53 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class ProfilePayload(BaseModel):
-    profile: str
-    focus: str = "growth, best performing posts, current trends, improvement suggestions"
-
 class PostsPayload(BaseModel):
-    shortcodes: List[str]
+    post_urls: List[str]
     focus: str = "engagement comparison, best performing, improvement suggestions"
 
-class ChatPayload(BaseModel):
-    question: str
-    chat_history: List[Dict[str, str]] = []
-
-@app.post("/api/analyze-profile")
-async def analyze(payload: ProfilePayload):
-    try:
-        result = analyze_profile(payload.profile, payload.focus)
-        return {"success": True, "analysis": result, "profile": payload.profile}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
 @app.post("/api/analyze-posts")
-async def analyze_posts_endpoint(payload: PostsPayload):
+async def analyze_posts(payload: PostsPayload):
     try:
-        result = analyze_posts(payload.shortcodes, payload.focus)
-        return {"success": True, "analysis": result, "shortcodes": payload.shortcodes}
+        print(f"🔍 Analyzing {len(payload.post_urls)} Instagram posts via Apify...")
+
+        init_db()
+        results = scrape_posts(payload.post_urls, results_limit=50)
+
+        print(f"Fetched {len(results)} items. Storing in database...")
+        for item in results:
+            post_data = {
+                "post_url": item.get("url"),
+                "shortcode": item.get("shortCode"),
+                "username": item.get("ownerUsername"),
+                "caption": item.get("caption"),
+                "likes_count": item.get("likesCount", 0),
+                "comments_count": item.get("commentsCount", 0),
+                "timestamp": item.get("timestamp"),
+            }
+            # Reuse your existing insert_post
+            from db import insert_post
+            insert_post(post_data)
+
+        print("Running analysis...")
+        run_full_analysis()
+
+        df = load_dataframe()
+        
+        summary = {
+            "total_posts": len(df),
+            "avg_likes": round(float(df['likes_count'].mean()), 1) if not df.empty else 0,
+            "avg_comments": round(float(df['comments_count'].mean()), 1) if not df.empty else 0,
+            "charts": ["engagement_trend.png", "top_posts.png"]
+        }
+
+        return {
+            "success": True,
+            "analysis": f"Analyzed {len(results)} posts successfully.",
+            "summary": summary,
+            "raw_posts": results[:10]  # limit for frontend
+        }
     except Exception as e:
         return {"success": False, "error": str(e)}
-
-@app.post("/api/chat")
-async def chat_endpoint(payload: ChatPayload):
-    try:
-        retriever = vector_store.as_retriever(search_kwargs={"k": 4})
-        
-        template = """You are an expert social media growth strategist.
-        Use the following previous analyses and context to answer the user's question.
-
-        Context:
-        {context}
-
-        Question: {question}
-
-        Important: Respond with clean, natural English paragraphs and bullet points only.
-        Do NOT output JSON, code blocks, or any technical formatting.
-        Just write like a normal helpful AI assistant."""
-
-        prompt = ChatPromptTemplate.from_template(template)
-
-        chain = (
-            {"context": retriever, "question": RunnablePassthrough()}
-            | prompt
-            | llm
-            | StrOutputParser()
-        )
-
-        response = chain.invoke(payload.question)
-        return {"response": response}
-        
-    except Exception as e:
-        return {"response": f"Sorry, I encountered an error: {str(e)}"}
 
 @app.get("/health")
 async def health():
